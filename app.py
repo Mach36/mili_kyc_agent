@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import uuid
+from datetime import date
 from typing import Any, Dict, List
 
 import streamlit as st
@@ -10,12 +11,14 @@ import streamlit.components.v1 as components
 
 from agent import run_kyc_agent
 from sample_data import INCOMPLETE_SAMPLE, NEW_CLIENT_SAMPLE, seed_clients
+from tools import calculate_age
 
 st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 
 
 PROFILE_FIELDS = [
     "name",
+    "date_of_birth",
     "age",
     "occupation",
     "income",
@@ -64,6 +67,7 @@ def new_empty_profile(client_id: str, name: str) -> Dict[str, Any]:
     return {
         "client_id": client_id,
         "name": name or None,
+        "date_of_birth": None,
         "age": None,
         "occupation": None,
         "marital_status": None,
@@ -311,15 +315,51 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             key=f"name_{client_id}_{version}",
         ) or None
     with c2:
-        age_value = profile.get("age") or 0
-        profile["age"] = st.number_input(
-            "Age",
-            min_value=0,
-            max_value=100,
-            value=int(age_value),
-            step=1,
-            key=f"age_{client_id}_{version}",
-        ) or None
+        stored_date_of_birth = profile.get("date_of_birth")
+        try:
+            date_of_birth_value = date.fromisoformat(stored_date_of_birth) if stored_date_of_birth else None
+        except (TypeError, ValueError):
+            date_of_birth_value = None
+
+        selected_date_of_birth = st.date_input(
+            "Date of birth",
+            value=date_of_birth_value,
+            min_value=date(1900, 1, 1),
+            max_value=date.today(),
+            key=f"date_of_birth_{client_id}_{version}",
+            format="DD/MM/YYYY",
+        )
+        profile["date_of_birth"] = selected_date_of_birth.isoformat() if selected_date_of_birth else None
+        profile["age"] = calculate_age(profile["date_of_birth"]) if profile["date_of_birth"] else None
+        if profile["age"] is not None:
+            date_input_key = f"date_of_birth_{client_id}_{version}"
+            st.markdown(
+                f"""
+                <style>
+                .st-key-{date_input_key} [data-baseweb="input"] {{
+                    position: relative;
+                }}
+                .st-key-{date_input_key} [data-baseweb="input"] input {{
+                    padding-right: 6.5rem;
+                }}
+                .st-key-{date_input_key} [data-baseweb="input"]::after {{
+                    content: "Age: {profile['age']}";
+                    position: absolute;
+                    right: 5%;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    color: inherit;
+                    opacity: 0.6;
+                    font-family: inherit;
+                    font-size: 0.875rem;
+                    line-height: 1.25rem;
+                    white-space: nowrap;
+                    pointer-events: none;
+                }}
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
     with c3:
         profile["occupation"] = st.text_input(
             "Occupation",

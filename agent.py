@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 
 from tools import (
+    calculate_age,
     extract_kyc_profile,
     validate_kyc_completeness,
     generate_follow_up_questions,
@@ -33,6 +34,8 @@ Important boundaries:
 - Do not assign a final suitability decision.
 - Do not treat inferred information as confirmed.
 - Always keep the advisor in the loop.
+- Extract date_of_birth as YYYY-MM-DD and always derive age from it. Never infer
+  a date of birth from an age.
 
 Final output must be valid JSON only.
 Do not wrap the JSON in markdown.
@@ -43,6 +46,7 @@ The final JSON should follow this shape:
 {
   "client_id": "...",
   "name": "...",
+  "date_of_birth": "YYYY-MM-DD",
   "age": 0,
   "occupation": "...",
   "income": "...",
@@ -109,7 +113,11 @@ def _merge_profile(existing_profile: Optional[Dict[str, Any]], new_profile: Dict
     existing values.
     """
     if not existing_profile:
-        return new_profile
+        merged = dict(new_profile)
+        date_of_birth = merged.get("date_of_birth")
+        if date_of_birth:
+            merged["age"] = calculate_age(date_of_birth)
+        return merged
 
     merged = dict(existing_profile)
 
@@ -158,6 +166,9 @@ def _merge_profile(existing_profile: Optional[Dict[str, Any]], new_profile: Dict
         # For scalar fields, update only when new value is useful.
         merged[key] = value
 
+    date_of_birth = merged.get("date_of_birth")
+    if date_of_birth:
+        merged["age"] = calculate_age(date_of_birth)
     return merged
 
 

@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 try:
@@ -122,7 +123,59 @@ def _extract_name(text: str) -> Optional[str]:
     )
 
 
-def _extract_age(text: str) -> Optional[int]:
+def calculate_age(date_of_birth: str, as_of: Optional[date] = None) -> Optional[int]:
+    """Calculate age from an ISO date of birth, accounting for the birthday."""
+    try:
+        born = date.fromisoformat(date_of_birth)
+    except (TypeError, ValueError):
+        return None
+
+    today = as_of or date.today()
+    if born > today:
+        return None
+
+    return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+def _extract_date_of_birth(text: str) -> Optional[str]:
+    value = (
+        _first_match(
+            text,
+            [
+                r"\b(?:date of birth|DOB|born on)\s*[:\-]?\s*([A-Za-z0-9, /\-]+?)(?=\s*(?:\.|\n|$))",
+            ],
+        )
+        or _line_value(text, "Date of birth")
+        or _line_value(text, "DOB")
+    )
+    if not value:
+        return None
+
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    formats = (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%m/%d/%Y",
+        "%d %B %Y",
+        "%d %b %Y",
+        "%B %d, %Y",
+        "%b %d, %Y",
+    )
+    for date_format in formats:
+        try:
+            parsed = datetime.strptime(cleaned, date_format).date()
+        except ValueError:
+            continue
+        return parsed.isoformat() if calculate_age(parsed.isoformat()) is not None else None
+    return None
+
+
+def _extract_age(text: str, date_of_birth: Optional[str] = None) -> Optional[int]:
+    if date_of_birth:
+        return calculate_age(date_of_birth)
+
+    # Retained for compatibility with older notes that contain only an age.
     value = _line_value(text, "Age") or _first_match(
         text,
         [
@@ -374,7 +427,7 @@ def _extract_declared_missing(text: str) -> List[str]:
 
 _CORE_MISSING_ITEMS = {
     "client full name",
-    "age or date of birth",
+    "date of birth",
     "occupation or employment status",
     "income range",
     "financial goals",
@@ -409,7 +462,7 @@ def _completion_score(
     section_checks = {
         "personal_details": [
             (5, profile.get("name")),
-            (5, profile.get("age")),
+            (5, profile.get("date_of_birth")),
             (5, profile.get("occupation")),
             (5, profile.get("dependents")),
         ],
@@ -460,10 +513,12 @@ def local_extract_kyc_profile(raw_text: str, client_id: str = "new_client") -> D
     """Extract a structured KYC profile from raw onboarding text."""
     text = _normalise(raw_text or "")
 
+    date_of_birth = _extract_date_of_birth(text)
     return {
         "client_id": client_id,
         "name": _extract_name(text),
-        "age": _extract_age(text),
+        "date_of_birth": date_of_birth,
+        "age": _extract_age(text, date_of_birth),
         "occupation": _extract_occupation(text),
         "marital_status": _extract_marital_status(text),
         "income": _extract_income(text),
@@ -490,8 +545,8 @@ def local_validate_kyc_completeness(profile: Dict[str, Any]) -> Dict[str, Any]:
 
     if not profile.get("name"):
         missing.append("Client full name")
-    if not profile.get("age"):
-        missing.append("Age or date of birth")
+    if not profile.get("date_of_birth"):
+        missing.append("Date of birth")
     if not profile.get("occupation"):
         missing.append("Occupation or employment status")
     if not profile.get("income"):
@@ -545,7 +600,7 @@ def local_generate_follow_up_questions(validation_result: Dict[str, Any]) -> Lis
 
     question_map = {
         "Client full name": "Can you confirm the client's full legal name?",
-        "Age or date of birth": "Can you confirm the client's age or date of birth?",
+        "Date of birth": "Can you confirm the client's date of birth?",
         "Occupation or employment status": "What is the client's occupation and employment status?",
         "Income range": "What is the client's approximate annual income range?",
         "Financial goals": "What are the client's main financial goals and priorities?",

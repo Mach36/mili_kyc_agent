@@ -10,6 +10,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
             "profile": {
                 "client_id": "client_001",
                 "name": "Anika Sharma",
+                "date_of_birth": "1984-04-15",
                 "age": 42,
                 "occupation": "Product Director",
                 "goals": [
@@ -43,7 +44,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                 {
                     "doc_id": "doc_001",
                     "title": "Initial Meeting Notes",
-                    "text": "Client: Anika Sharma, age 42. Works as a Product Director. Wants retirement planning and daughter's university education. Comfortable with moderate risk but does not want large short-term losses. May need liquidity for home renovation in the next 18 months. Spouse and daughter are dependents. Income approx INR 55L. Has equity mutual funds, fixed deposits and emergency savings. Has home loan EMI.",
+                    "text": "Client: Anika Sharma. Date of birth: 15 April 1984. Works as a Product Director. Wants retirement planning and daughter's university education. Comfortable with moderate risk but does not want large short-term losses. May need liquidity for home renovation in the next 18 months. Spouse and daughter are dependents. Income approx INR 55L. Has equity mutual funds, fixed deposits and emergency savings. Has home loan EMI.",
                     "active": True,
                 }
             ],
@@ -53,6 +54,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
             "profile": {
                 "client_id": "client_002",
                 "name": "Rohan Mehta",
+                "date_of_birth": "1990-02-10",
                 "age": 36,
                 "occupation": "Business owner",
                 "goals": ["Grow wealth over the next 5 years", "Buy a second property"],
@@ -81,6 +83,6 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
     }
 
 
-NEW_CLIENT_SAMPLE = """Client: Priya Kapoor, age 39. Works as a senior consultant. She wants to invest for retirement and for her son's education. She says she is low risk and wants capital protection, but later says she wants aggressive growth and high returns within 2 years. She may need cash for a home renovation next year. Her husband and son are dependents. Existing assets include fixed deposits and some equity mutual funds. No income, liabilities, or exact investment amount provided."""
+NEW_CLIENT_SAMPLE = """Client: Priya Kapoor. Date of birth: 12 May 1987. Works as a senior consultant. She wants to invest for retirement and for her son's education. She says she is low risk and wants capital protection, but later says she wants aggressive growth and high returns within 2 years. She may need cash for a home renovation next year. Her husband and son are dependents. Existing assets include fixed deposits and some equity mutual funds. No income, liabilities, or exact investment amount provided."""
 
-INCOMPLETE_SAMPLE = """Client: Kabir Arora. Met during discovery call. He wants help with long-term wealth creation and may invest later this year. He mentioned that his parents may depend on him financially. No age, income, existing assets, liabilities, risk tolerance, or time horizon were confirmed."""
+INCOMPLETE_SAMPLE = """Client: Kabir Arora. Met during discovery call. He wants help with long-term wealth creation and may invest later this year. He mentioned that his parents may depend on him financially. No date of birth, income, existing assets, liabilities, risk tolerance, or time horizon were confirmed."""
