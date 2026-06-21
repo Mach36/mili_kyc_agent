@@ -13,6 +13,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                 "date_of_birth": "1984-04-15",
                 "age": 42,
                 "occupation": "Product Director",
+                "marital_status": "Married",
                 "goals": [
                     "Retirement planning in 18-20 years",
                     "Daughter's university education in around 6 years",
@@ -43,8 +44,29 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
             "documents": [
                 {
                     "doc_id": "doc_001",
-                    "title": "Initial Meeting Notes",
-                    "text": "Client: Anika Sharma. Date of birth: 15 April 1984. Works as a Product Director. Wants retirement planning and daughter's university education. Comfortable with moderate risk but does not want large short-term losses. May need liquidity for home renovation in the next 18 months. Spouse and daughter are dependents. Income approx INR 55L. Has equity mutual funds, fixed deposits and emergency savings. Has home loan EMI.",
+                    "title": "Consolidated KYC Fact Find",
+                    "text": (
+                        "Client name: Anika Sharma\n"
+                        "Date of birth: 15 April 1984\n"
+                        "Occupation: Product Director\n"
+                        "Marital status: Married\n"
+                        "Dependents: Spouse, one daughter aged 12\n"
+                        "Household income: Approximately INR 55L annually\n"
+                        "Goals: Retirement planning in 18-20 years; daughter's "
+                        "university education in around 6 years.\n"
+                        "Risk tolerance: Moderate. Anika is comfortable with moderate "
+                        "risk but does not want large short-term losses.\n"
+                        "Liquidity needs: She may need liquidity for a home renovation "
+                        "in the next 18 months. The amount of emergency cash that must "
+                        "remain untouched has not been confirmed.\n"
+                        "Existing investments include equity mutual funds, fixed deposits, and "
+                        "emergency savings.\n"
+                        "Liabilities: Home loan EMI.\n"
+                        "Information not provided: Existing portfolio value and "
+                        "insurance coverage.\n"
+                        "Advisor review note: Confirm risk tolerance with a short "
+                        "questionnaire."
+                    ),
                     "active": True,
                 }
             ],
@@ -57,6 +79,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                 "date_of_birth": "1990-02-10",
                 "age": 36,
                 "occupation": "Business owner",
+                "marital_status": "Married",
                 "goals": ["Grow wealth over the next 5 years", "Buy a second property"],
                 "risk_tolerance": {
                     "value": "High / Growth-oriented",
@@ -78,7 +101,28 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                 "confidence_notes": ["Risk tolerance is internally inconsistent and needs advisor review."],
                 "completion_score": 68,
             },
-            "documents": [],
+            "documents": [
+                {
+                    "doc_id": "doc_002",
+                    "title": "Discovery Call Notes",
+                    "text": (
+                        "Discovery call for Rohan Mehta, DOB 10 February 1990. He is a "
+                        "business owner and is married; wife and one son depend on him. "
+                        "Kept coming back to aggressive growth and growing wealth over "
+                        "roughly the next 5 years, with buying a second property also "
+                        "somewhere on the list. Said he wants the portfolio positioned "
+                        "for growth, but later said he really dislikes losses and cannot "
+                        "tolerate seeing his investments decline - need to pin down what "
+                        "that actually means. Existing investments include business cash "
+                        "flows and equity investments. We ran out of time before getting "
+                        "an income range, and neither debt obligations nor near-term cash "
+                        "needs were properly discussed. Follow up on the maximum "
+                        "short-term fall he could accept and whether any liabilities are "
+                        "attached to the business."
+                    ),
+                    "active": True,
+                }
+            ],
         },
     }
 
