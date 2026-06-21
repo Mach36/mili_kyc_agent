@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Dict, List
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from agent import run_kyc_agent
 from sample_data import INCOMPLETE_SAMPLE, NEW_CLIENT_SAMPLE, seed_clients
@@ -115,6 +116,60 @@ def normalise_time_horizon_key(value: str) -> str:
 def format_time_horizon_label(key: str) -> str:
     """Convert JSON keys like child_education into advisor-facing labels."""
     return (key or "").replace("_", " ").strip().title() or "Goal / Need"
+
+
+def disable_risk_confidence_typing() -> None:
+    """Keep Streamlit's select UI while disabling its built-in search input."""
+    components.html(
+        """
+        <script>
+        const hostDocument = window.parent.document;
+        const selector = '[class*="st-key-risk_tolerance_control_"] .stSelectbox input';
+
+        function markConfidenceMenu() {
+            const riskInput = hostDocument.querySelector(selector);
+            const riskMenuIsOpen = riskInput?.getAttribute('aria-expanded') === 'true';
+            hostDocument.querySelectorAll('[data-testid="stSelectboxVirtualDropdown"]').forEach((menu) => {
+                if (riskMenuIsOpen) {
+                    menu.dataset.riskConfidenceMenu = 'true';
+                } else {
+                    delete menu.dataset.riskConfidenceMenu;
+                }
+            });
+        }
+
+        function lockConfidenceInput() {
+            hostDocument.querySelectorAll(selector).forEach((input) => {
+                input.readOnly = true;
+                input.setAttribute('inputmode', 'none');
+                if (input.dataset.confidenceTypingLocked === 'true') return;
+
+                input.dataset.confidenceTypingLocked = 'true';
+                input.addEventListener('beforeinput', (event) => event.preventDefault());
+                input.addEventListener('keydown', (event) => {
+                    if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                });
+            });
+            markConfidenceMenu();
+        }
+
+        lockConfidenceInput();
+        const observer = new MutationObserver(lockConfidenceInput);
+        observer.observe(hostDocument.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['aria-expanded'],
+        });
+        window.addEventListener('beforeunload', () => observer.disconnect());
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 
 def render_time_horizon_editor(profile: Dict[str, Any], client_id: str, version: int) -> None:
@@ -281,36 +336,22 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
         rt = profile.get("risk_tolerance", {}) or {}
         confidence_options = ["unknown", "low", "medium", "high"]
         current_confidence = rt.get("confidence", "unknown")
-        if current_confidence not in confidence_options:
-            current_confidence = "unknown"
         with st.container(key=f"risk_tolerance_control_{client_id}_{version}"):
             rt_value = st.text_input(
                 "Risk tolerance",
                 value=rt.get("value") or "",
                 key=f"risk_value_{client_id}_{version}",
             ) or None
-            confidence_label = "Confidence" if current_confidence == "unknown" else current_confidence.title()
-            rt_conf = current_confidence
-            with st.popover(
-                confidence_label,
+            rt_conf = st.selectbox(
+                "Risk confidence",
+                confidence_options,
+                index=confidence_options.index(current_confidence) if current_confidence in confidence_options else 0,
+                key=f"risk_confidence_{client_id}_{version}",
+                format_func=lambda option: option.title(),
+                label_visibility="collapsed",
                 help="Confidence in the recorded risk tolerance",
-                use_container_width=True,
-            ):
-                st.caption("Confidence")
-                for option in confidence_options:
-                    option_label = "Unknown" if option == "unknown" else option.title()
-                    if st.button(
-                        option_label,
-                        key=f"risk_confidence_{option}_{client_id}_{version}",
-                        use_container_width=True,
-                        type="primary" if option == current_confidence else "secondary",
-                    ):
-                        profile["risk_tolerance"] = {
-                            "value": rt_value,
-                            "confidence": option,
-                            "evidence": rt.get("evidence"),
-                        }
-                        st.rerun()
+                accept_new_options=False,
+            )
         profile["risk_tolerance"] = {
             "value": rt_value,
             "confidence": rt_conf,
@@ -591,29 +632,42 @@ def main() -> None:
         [class*="st-key-risk_tolerance_control_"] .stTextInput input {
             padding-right: 7.25rem;
         }
-        [class*="st-key-risk_tolerance_control_"] [data-testid="stElementContainer"]:has(> .stPopover) {
+        [class*="st-key-risk_tolerance_control_"] [data-testid="stElementContainer"]:has(> .stSelectbox) {
             position: absolute;
             right: 0.25rem;
             bottom: 0.25rem;
             width: 6.75rem;
             z-index: 1;
         }
-        [class*="st-key-risk_tolerance_control_"] .stPopover button {
-            height: 2rem;
+        [class*="st-key-risk_tolerance_control_"] .stSelectbox [data-baseweb="select"] > div {
             min-height: 2rem;
-            padding: 0 0.45rem;
+            height: 2rem;
         }
-        [class*="st-key-risk_tolerance_control_"] .stPopover button * {
+        [class*="st-key-risk_tolerance_control_"] .stSelectbox [data-baseweb="select"] * {
             font-size: 0.72rem;
         }
-        [data-testid="stPopoverBody"]:has([class*="st-key-risk_confidence_"]) *,
-        [data-testid="stPopoverBody"]:has([class*="st-key-risk_confidence_"]) button {
+        [class*="st-key-risk_tolerance_control_"] .stSelectbox input {
+            caret-color: transparent;
+        }
+        [data-testid="stSelectboxVirtualDropdown"][data-risk-confidence-menu="true"]::before {
+            content: "Confidence";
+            display: block;
+            padding: 0.4rem 0.75rem 0.2rem;
+            color: var(--text-color);
+            opacity: 0.65;
+            font-size: 0.68rem;
+            font-style: italic;
+            line-height: 1rem;
+        }
+        [data-testid="stSelectboxVirtualDropdown"][data-risk-confidence-menu="true"] [role="option"],
+        [data-testid="stSelectboxVirtualDropdown"][data-risk-confidence-menu="true"] [role="option"] * {
             font-size: 0.72rem;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
+    disable_risk_confidence_typing()
     tab1, tab2, tab3 = st.tabs(["Client profile", "Documents & agent", "Underlying JSON"])
 
     with tab1:
