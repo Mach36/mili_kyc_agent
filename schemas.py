@@ -16,6 +16,7 @@ class ClientProfile(BaseModel):
     date_of_birth: Optional[str] = None
     age: Optional[int] = None
     occupation: Optional[str] = None
+    marital_status: Optional[str] = None
     goals: List[str] = Field(default_factory=list)
     risk_tolerance: EvidenceField = Field(default_factory=EvidenceField)
     time_horizon: Dict[str, str] = Field(default_factory=dict)

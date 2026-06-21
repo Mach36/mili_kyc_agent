@@ -49,6 +49,7 @@ The final JSON should follow this shape:
   "date_of_birth": "YYYY-MM-DD",
   "age": 0,
   "occupation": "...",
+  "marital_status": "...",
   "income": "...",
   "goals": [],
   "risk_tolerance": {

@@ -701,6 +701,10 @@ def main() -> None:
         [class*="st-key-risk_tolerance_control_"] .stSelectbox [data-baseweb="select"] * {
             font-size: 0.72rem;
         }
+        [class*="st-key-risk_tolerance_control_"]
+        .stSelectbox [data-baseweb="select"] > div > div:first-child > div:first-child {
+            transform: translateX(0.25rem);
+        }
         [class*="st-key-risk_tolerance_control_"] .stSelectbox input {
             caret-color: transparent;
         }

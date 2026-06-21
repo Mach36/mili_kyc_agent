@@ -201,15 +201,46 @@ def _extract_occupation(text: str) -> Optional[str]:
     )
 
 
-def _extract_marital_status(text: str) -> Optional[str]:
+def _extract_marital_status(
+    text: str,
+    dependents: Optional[List[str]] = None,
+) -> Optional[str]:
+    status_patterns = (
+        (
+            "Divorced",
+            r"\bdivorc(?:e|ed|ee|ing)\b|\bno longer married\b|"
+            r"\b(?:ex|former)[ -](?:wife|husband|spouse)\b",
+        ),
+        (
+            "Widowed",
+            r"\bwidow(?:ed|er)?\b|\blate (?:wife|husband|spouse)\b|"
+            r"\b(?:wife|husband|spouse) (?:is )?(?:deceased|passed away|died)\b",
+        ),
+        (
+            "Separated",
+            r"\bseparated\b|\bliving separately\b|"
+            r"\bestranged (?:wife|husband|spouse)\b",
+        ),
+        ("Single", r"\b(?:single|unmarried)\b|\b(?:never|not) married\b"),
+        ("Married", r"\bmarried\b"),
+    )
+
     value = _line_value(text, "Marital status")
     if value:
+        for status, pattern in status_patterns:
+            if re.search(pattern, value, re.I):
+                return status
         return value
-    lower = text.lower()
-    if "married" in lower:
+
+    for status, pattern in status_patterns:
+        if re.search(pattern, text, re.I):
+            return status
+
+    if any(
+        re.search(r"\b(?:husband|wife|spouse)\b", dependent, re.I)
+        for dependent in (dependents or [])
+    ):
         return "Married"
-    if "single" in lower:
-        return "Single"
     return None
 
 
@@ -233,12 +264,12 @@ def _extract_dependents(text: str) -> List[str]:
         return _split_list(value)
 
     dependents: List[str] = []
-    lower = text.lower()
-    if "husband" in lower:
+    current_partner_prefix = r"(?<!ex-)(?<!ex )(?<!former )"
+    if re.search(current_partner_prefix + r"\bhusband\b", text, re.I):
         dependents.append("Husband")
-    if "wife" in lower:
+    if re.search(current_partner_prefix + r"\bwife\b", text, re.I):
         dependents.append("Wife")
-    if "spouse" in lower:
+    if re.search(current_partner_prefix + r"\bspouse\b", text, re.I):
         dependents.append("Spouse")
 
     son_match = re.search(r"\b(?:one\s+)?son(?:\s+aged\s+\d{1,2})?\b", text, re.I)
@@ -514,19 +545,20 @@ def local_extract_kyc_profile(raw_text: str, client_id: str = "new_client") -> D
     text = _normalise(raw_text or "")
 
     date_of_birth = _extract_date_of_birth(text)
+    dependents = _extract_dependents(text)
     return {
         "client_id": client_id,
         "name": _extract_name(text),
         "date_of_birth": date_of_birth,
         "age": _extract_age(text, date_of_birth),
         "occupation": _extract_occupation(text),
-        "marital_status": _extract_marital_status(text),
+        "marital_status": _extract_marital_status(text, dependents),
         "income": _extract_income(text),
         "goals": _extract_goals(text),
         "risk_tolerance": _risk_tolerance(text),
         "time_horizon": _extract_time_horizon(text),
         "liquidity_needs": _extract_liquidity_needs(text),
-        "dependents": _extract_dependents(text),
+        "dependents": dependents,
         "assets": _extract_assets(text),
         "liabilities": _extract_liabilities(text),
         "missing_information": _extract_declared_missing(text),
