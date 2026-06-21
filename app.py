@@ -35,6 +35,14 @@ LIST_FIELDS = [
 
 PROFILE_TEXT_AREA_HEIGHT = 120
 
+MARITAL_STATUS_OPTIONS = [
+    "Single",
+    "Married",
+    "Divorced",
+    "Widowed",
+    "Separated",
+]
+
 
 def init_state() -> None:
     if "clients" not in st.session_state:
@@ -319,10 +327,17 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             key=f"occupation_{client_id}_{version}",
         ) or None
     with c4:
-        profile["marital_status"] = st.text_input(
+        current_marital_status = (profile.get("marital_status") or "").strip()
+        marital_status_options = [""] + MARITAL_STATUS_OPTIONS
+        if current_marital_status and current_marital_status not in marital_status_options:
+            marital_status_options.append(current_marital_status)
+
+        profile["marital_status"] = st.selectbox(
             "Marital status",
-            value=profile.get("marital_status") or "",
+            marital_status_options,
+            index=marital_status_options.index(current_marital_status),
             key=f"marital_status_{client_id}_{version}",
+            format_func=lambda option: option or "Select marital status",
         ) or None
 
     c4, c5 = st.columns(2)
