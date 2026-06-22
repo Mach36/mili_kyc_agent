@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import uuid
 from datetime import date
@@ -11,7 +10,7 @@ import streamlit.components.v1 as components
 
 from agent import run_kyc_agent
 from sample_data import INCOMPLETE_SAMPLE, NEW_CLIENT_SAMPLE, seed_clients
-from tools import calculate_age
+from tools import calculate_age, merge_kyc_profiles
 
 # st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 APP_TITLE = "Mili KYC Agent"
@@ -119,23 +118,7 @@ def new_empty_profile(client_id: str, name: str) -> Dict[str, Any]:
 
 def merge_profile(existing: Dict[str, Any], extracted: Dict[str, Any]) -> Dict[str, Any]:
     """Merge agent output without deleting advisor-confirmed fields when new data is incomplete."""
-    merged = copy.deepcopy(existing)
-    for key, value in extracted.items():
-        if key == "client_id":
-            continue
-        if value in [None, "", [], {}]:
-            continue
-        if isinstance(value, list):
-            current = merged.get(key, []) or []
-            combined = list(dict.fromkeys(current + value))
-            merged[key] = combined
-        elif isinstance(value, dict):
-            current = merged.get(key, {}) or {}
-            current.update({k: v for k, v in value.items() if v not in [None, "", [], {}]})
-            merged[key] = current
-        else:
-            merged[key] = value
-    return merged
+    return merge_kyc_profiles(existing, extracted)
 
 
 def list_to_text(items: List[str]) -> str:

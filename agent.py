@@ -5,13 +5,13 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 
 from tools import (
-    calculate_age,
     extract_kyc_profile,
     validate_kyc_completeness,
     generate_follow_up_questions,
     local_extract_kyc_profile,
     local_validate_kyc_completeness,
     local_generate_follow_up_questions,
+    merge_kyc_profiles,
 )
 
 load_dotenv()
@@ -120,64 +120,7 @@ def _merge_profile(existing_profile: Optional[Dict[str, Any]], new_profile: Dict
     filled or reviewed. Therefore, empty values from the new run should not wipe
     existing values.
     """
-    if not existing_profile:
-        merged = dict(new_profile)
-        date_of_birth = merged.get("date_of_birth")
-        if date_of_birth:
-            merged["age"] = calculate_age(date_of_birth)
-        return merged
-
-    merged = dict(existing_profile)
-
-    for key, value in new_profile.items():
-        if value in [None, "", [], {}]:
-            continue
-
-        # These should always reflect the latest run.
-        if key in [
-            "missing_information",
-            "contradictions",
-            "follow_up_questions",
-            "confidence_notes",
-            "completion_score",
-        ]:
-            merged[key] = value
-            continue
-
-        # For list fields, combine and deduplicate.
-        if isinstance(value, list):
-            existing_list = merged.get(key, [])
-            if not isinstance(existing_list, list):
-                existing_list = []
-
-            combined = existing_list + value
-            deduped = []
-            for item in combined:
-                if item not in deduped:
-                    deduped.append(item)
-
-            merged[key] = deduped
-            continue
-
-        # For dict fields, shallow merge.
-        if isinstance(value, dict):
-            existing_dict = merged.get(key, {})
-            if not isinstance(existing_dict, dict):
-                existing_dict = {}
-
-            merged[key] = {
-                **existing_dict,
-                **{k: v for k, v in value.items() if v not in [None, "", [], {}]},
-            }
-            continue
-
-        # For scalar fields, update only when new value is useful.
-        merged[key] = value
-
-    date_of_birth = merged.get("date_of_birth")
-    if date_of_birth:
-        merged["age"] = calculate_age(date_of_birth)
-    return merged
+    return merge_kyc_profiles(existing_profile, new_profile)
 
 
 def _local_fallback_run(

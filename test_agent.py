@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from agent import run_kyc_agent
+from sample_data import seed_clients
 
 
 class AgentModeTests(unittest.TestCase):
@@ -15,6 +16,29 @@ class AgentModeTests(unittest.TestCase):
 
         self.assertEqual(result["mode"], "local_fallback")
         self.assertEqual(result["profile"]["client_id"], "client_test")
+
+    def test_rerunning_anika_profile_does_not_duplicate_semantic_facts(self):
+        anika = seed_clients()["client_001"]
+
+        result = run_kyc_agent(
+            anika["documents"][0]["text"],
+            client_id="client_001",
+            existing_profile=anika["profile"],
+            force_local=True,
+        )
+
+        self.assertEqual(
+            result["profile"]["dependents"],
+            ["Spouse", "One daughter aged 12"],
+        )
+        self.assertEqual(
+            result["profile"]["goals"],
+            [
+                "Retirement planning in 18-20 years",
+                "Daughter's university education in around 6 years",
+                "Maintain liquidity for possible home renovation",
+            ],
+        )
 
 
 if __name__ == "__main__":

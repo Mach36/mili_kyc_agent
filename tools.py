@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 from datetime import date, datetime
@@ -160,6 +161,123 @@ def calculate_age(date_of_birth: str, as_of: Optional[date] = None) -> Optional[
         return None
 
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+
+_LATEST_RUN_LIST_FIELDS = {
+    "missing_information",
+    "contradictions",
+    "follow_up_questions",
+    "confidence_notes",
+}
+
+
+def _list_item_key(value: Any) -> str:
+    """Normalise harmless formatting differences in advisor-facing list items."""
+    return re.sub(r"[^a-z0-9]+", " ", str(value).casefold()).strip()
+
+
+def _list_item_concept(field_name: str, value: Any) -> Optional[str]:
+    """Return a narrow semantic key for common duplicate KYC facts."""
+    key = _list_item_key(value)
+
+    if field_name == "goals":
+        if "retirement" in key:
+            return "retirement"
+        if re.search(r"\b(?:education|university|college)\b", key):
+            if "daughter" in key:
+                return "education:daughter"
+            if "son" in key:
+                return "education:son"
+            return "education:general"
+        if "home renovation" in key:
+            return "home-renovation"
+
+    if field_name == "dependents":
+        if re.search(r"\b(?:spouse|wife|husband)\b", key):
+            return "partner"
+        if "daughter" in key:
+            return "daughter"
+        if "son" in key:
+            return "son"
+        if re.search(r"\bparents?\b", key):
+            return "parents"
+
+    return None
+
+
+def merge_list_values(field_name: str, existing: List[Any], incoming: List[Any]) -> List[Any]:
+    """Merge list values, keeping the most descriptive semantic duplicate."""
+    merged: List[Any] = []
+    exact_indexes: Dict[str, int] = {}
+    concept_indexes: Dict[str, int] = {}
+
+    for item in list(existing or []) + list(incoming or []):
+        exact_key = _list_item_key(item)
+        if not exact_key or exact_key in exact_indexes:
+            continue
+
+        concept = _list_item_concept(field_name, item)
+        if concept is not None and concept in concept_indexes:
+            index = concept_indexes[concept]
+            current = merged[index]
+            current_key = _list_item_key(current)
+            if (len(exact_key.split()), len(exact_key)) > (
+                len(current_key.split()),
+                len(current_key),
+            ):
+                del exact_indexes[current_key]
+                merged[index] = item
+                exact_indexes[exact_key] = index
+            continue
+
+        index = len(merged)
+        merged.append(item)
+        exact_indexes[exact_key] = index
+        if concept is not None:
+            concept_indexes[concept] = index
+
+    return merged
+
+
+def merge_kyc_profiles(
+    existing_profile: Optional[Dict[str, Any]],
+    new_profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Merge extracted KYC data without erasing previously reviewed values."""
+    merged = copy.deepcopy(existing_profile or {})
+
+    for key, value in new_profile.items():
+        if key == "client_id" and merged.get("client_id"):
+            continue
+        if value in [None, "", [], {}]:
+            continue
+
+        if isinstance(value, list):
+            if key in _LATEST_RUN_LIST_FIELDS:
+                merged[key] = copy.deepcopy(value)
+                continue
+            current = merged.get(key, [])
+            if not isinstance(current, list):
+                current = []
+            merged[key] = merge_list_values(key, current, value)
+            continue
+
+        if isinstance(value, dict):
+            current = merged.get(key, {})
+            if not isinstance(current, dict):
+                current = {}
+            merged[key] = {
+                **current,
+                **{k: v for k, v in value.items() if v not in [None, "", [], {}]},
+            }
+            continue
+
+        merged[key] = value
+
+    date_of_birth = merged.get("date_of_birth")
+    if date_of_birth:
+        merged["age"] = calculate_age(date_of_birth)
+    return merged
 
 
 def _extract_date_of_birth(text: str) -> Optional[str]:
