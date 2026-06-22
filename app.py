@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import date
@@ -16,6 +17,7 @@ from sample_data import (
     PRIYA_FOLLOW_UP_SAMPLE,
     seed_clients,
 )
+from text_upload import decode_text_upload
 from tools import calculate_age, merge_kyc_profiles
 
 # st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
@@ -671,8 +673,12 @@ def render_documents(client: Dict[str, Any]) -> None:
             key=f"upload_file_{input_version}",
         )
         uploaded_text = ""
+        upload_token = "no_upload"
         if uploaded_file is not None:
-            uploaded_text = uploaded_file.read().decode("utf-8", errors="ignore")
+            uploaded_bytes = uploaded_file.getvalue()
+            uploaded_text = decode_text_upload(uploaded_bytes)
+            upload_token = hashlib.sha256(uploaded_bytes).hexdigest()[:12]
+            st.caption(f"Loaded {uploaded_file.name}: {len(uploaded_text):,} characters")
 
         doc_title = st.text_input(
             "New document title",
@@ -683,7 +689,7 @@ def render_documents(client: Dict[str, Any]) -> None:
             "Paste or edit document text",
             value=uploaded_text or default_text,
             height=180,
-            key=f"new_doc_text_{input_version}_{sample_choice}",
+            key=f"new_doc_text_{input_version}_{sample_choice}_{upload_token}",
         )
 
         if st.button("Add document to client", type="primary", key=f"add_doc_{input_version}"):
