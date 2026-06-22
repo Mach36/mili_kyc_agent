@@ -104,7 +104,7 @@ class ProfileEditorTests(unittest.TestCase):
         open_dialog.click().run()
 
         sample_input = next(
-            widget for widget in app.selectbox if widget.label == "Use sample input"
+            widget for widget in app.selectbox if widget.label == "Sample data"
         )
         sample_input.set_value("Incomplete sample - Kabir").run()
 

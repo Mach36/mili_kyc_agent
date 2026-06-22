@@ -92,7 +92,7 @@ def apply_global_styles() -> None:
         .mili-eyebrow {{
             display: block;
             margin: 0 0 0.3rem;
-            padding-top: 0.35rem;
+            padding-top: 0.7rem;
             color: var(--mili-blue);
             font-size: 0.72rem;
             font-weight: 750;
@@ -261,7 +261,7 @@ def apply_global_styles() -> None:
             top: 3.75rem;
             z-index: 1000;
             isolation: isolate;
-            margin: 1rem 0 1.25rem;
+            margin: 0.3rem 0 1.25rem;
             padding: 0.35rem;
             border: 1px solid var(--mili-border);
             border-radius: var(--mili-radius);
@@ -299,7 +299,7 @@ def apply_global_styles() -> None:
             }}
             [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {{
                 top: 3.25rem;
-                margin-top: 0.75rem;
+                margin-top: 0.25rem;
             }}
             [data-baseweb="tab"] {{
                 padding: 0 0.75rem;
@@ -1003,19 +1003,29 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
 def render_add_document_dialog(client: Dict[str, Any]) -> None:
     input_version = st.session_state.document_input_version
     sample_key = f"sample_choice_{input_version}"
-    sample_choice = st.selectbox(
-        "Use sample input",
-        [
-            "None",
-            "Contradictory sample - Priya",
-            "Incomplete sample - Kabir",
-            "Discovery call - Priya",
-            "Follow up - Priya",
-        ],
-        key=sample_key,
-        on_change=clear_document_upload_for_sample,
-        args=(sample_key,),
-    )
+    with st.container(key="document_dialog_header"):
+        title_col, sample_col = st.columns(2, vertical_alignment="bottom")
+        with title_col:
+            doc_title = st.text_input(
+                "Document title",
+                value="Onboarding notes",
+                key=f"new_doc_title_{input_version}",
+            )
+        with sample_col:
+            sample_choice = st.selectbox(
+                "Sample data",
+                [
+                    "None",
+                    "Contradictory sample - Priya",
+                    "Incomplete sample - Kabir",
+                    "Discovery call - Priya",
+                    "Follow up - Priya",
+                ],
+                key=sample_key,
+                on_change=clear_document_upload_for_sample,
+                args=(sample_key,),
+            )
+
     default_text = ""
     if sample_choice == "Contradictory sample - Priya":
         default_text = NEW_CLIENT_SAMPLE
@@ -1039,11 +1049,6 @@ def render_add_document_dialog(client: Dict[str, Any]) -> None:
         upload_token = hashlib.sha256(uploaded_bytes).hexdigest()[:12]
         st.caption(f"Loaded {uploaded_file.name}: {len(uploaded_text):,} characters")
 
-    doc_title = st.text_input(
-        "New document title",
-        value="Onboarding notes",
-        key=f"new_doc_title_{input_version}",
-    )
     doc_text = st.text_area(
         "Paste or edit document text",
         value=uploaded_text or default_text,
