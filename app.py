@@ -96,6 +96,8 @@ def init_state() -> None:
         st.session_state.new_client_input_version = 0
     if "document_input_version" not in st.session_state:
         st.session_state.document_input_version = 0
+    if "document_upload_version" not in st.session_state:
+        st.session_state.document_upload_version = 0
     if "profile_editor_version" not in st.session_state:
         st.session_state.profile_editor_version = 0
 
@@ -137,6 +139,12 @@ def list_to_text(items: List[str]) -> str:
 
 def text_to_list(value: str) -> List[str]:
     return [line.strip(" -•\t") for line in value.splitlines() if line.strip(" -•\t")]
+
+
+def clear_document_upload_for_sample(sample_key: str) -> None:
+    """Reset the uploader when a sample becomes the active input source."""
+    if st.session_state.get(sample_key) != "None":
+        st.session_state.document_upload_version += 1
 
 
 def normalise_time_horizon_key(value: str) -> str:
@@ -682,6 +690,7 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
 @st.dialog("Add document")
 def render_add_document_dialog(client: Dict[str, Any]) -> None:
     input_version = st.session_state.document_input_version
+    sample_key = f"sample_choice_{input_version}"
     sample_choice = st.selectbox(
         "Use sample input",
         [
@@ -691,7 +700,9 @@ def render_add_document_dialog(client: Dict[str, Any]) -> None:
             "Discovery call - Priya",
             "Follow up - Priya",
         ],
-        key=f"sample_choice_{input_version}",
+        key=sample_key,
+        on_change=clear_document_upload_for_sample,
+        args=(sample_key,),
     )
     default_text = ""
     if sample_choice == "Contradictory sample - Priya":
@@ -706,7 +717,7 @@ def render_add_document_dialog(client: Dict[str, Any]) -> None:
     uploaded_file = st.file_uploader(
         "Upload .txt file",
         type=["txt"],
-        key=f"upload_file_{input_version}",
+        key=f"upload_file_{input_version}_{st.session_state.document_upload_version}",
     )
     uploaded_text = ""
     upload_token = "no_upload"
