@@ -10,6 +10,8 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
             "profile": {
                 "client_id": "client_001",
                 "name": "Anika Sharma",
+                "gender": "Female",
+                "pronouns": "she/her",
                 "date_of_birth": "1984-04-15",
                 "age": 42,
                 "occupation": "Product Director",
@@ -47,6 +49,8 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                     "title": "Consolidated KYC Fact Find",
                     "text": (
                         "Client name: Anika Sharma\n"
+                        "Gender: Female\n"
+                        "Pronouns: she/her\n"
                         "Date of birth: 15 April 1984\n"
                         "Occupation: Product Director\n"
                         "Marital status: Married\n"
@@ -76,6 +80,8 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
             "profile": {
                 "client_id": "client_002",
                 "name": "Rohan Mehta",
+                "gender": "Male",
+                "pronouns": "he/him",
                 "date_of_birth": "1990-02-10",
                 "age": 36,
                 "occupation": "Business owner",
@@ -107,6 +113,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
                     "title": "Discovery Call Notes",
                     "text": (
                         "Discovery call for Rohan Mehta, DOB 10 February 1990. He is a "
+                        "man and uses he/him pronouns. He is a "
                         "business owner and is married; wife and one son depend on him. "
                         "Kept coming back to aggressive growth and growing wealth over "
                         "roughly the next 5 years, with buying a second property also "

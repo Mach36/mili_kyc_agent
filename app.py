@@ -18,6 +18,8 @@ st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 
 PROFILE_FIELDS = [
     "name",
+    "gender",
+    "pronouns",
     "date_of_birth",
     "age",
     "occupation",
@@ -46,6 +48,14 @@ MARITAL_STATUS_OPTIONS = [
     "Separated",
 ]
 
+GENDER_OPTIONS = [
+    "Female",
+    "Male",
+    "Non-binary",
+    "Other",
+    "Prefer not to say",
+]
+
 
 def init_state() -> None:
     if "clients" not in st.session_state:
@@ -67,6 +77,8 @@ def new_empty_profile(client_id: str, name: str) -> Dict[str, Any]:
     return {
         "client_id": client_id,
         "name": name or None,
+        "gender": None,
+        "pronouns": None,
         "date_of_birth": None,
         "age": None,
         "occupation": None,
@@ -136,27 +148,39 @@ def disable_risk_confidence_typing() -> None:
         """
         <script>
         const hostDocument = window.parent.document;
-        const selector = '[class*="st-key-risk_tolerance_control_"] .stSelectbox input';
+        const riskSelector = '[class*="st-key-risk_tolerance_control_"] .stSelectbox input';
+        const genderSelector = '[class*="st-key-identity_details_"] .stSelectbox input';
+        const lockedSelectSelector = [
+            riskSelector,
+            genderSelector,
+        ].join(', ');
 
-        function markConfidenceMenu() {
-            const riskInput = hostDocument.querySelector(selector);
+        function markSelectMenu() {
+            const riskInput = hostDocument.querySelector(riskSelector);
+            const genderInput = hostDocument.querySelector(genderSelector);
             const riskMenuIsOpen = riskInput?.getAttribute('aria-expanded') === 'true';
+            const genderMenuIsOpen = genderInput?.getAttribute('aria-expanded') === 'true';
             hostDocument.querySelectorAll('[data-testid="stSelectboxVirtualDropdown"]').forEach((menu) => {
                 if (riskMenuIsOpen) {
                     menu.dataset.riskConfidenceMenu = 'true';
                 } else {
                     delete menu.dataset.riskConfidenceMenu;
                 }
+                if (genderMenuIsOpen) {
+                    menu.dataset.genderMenu = 'true';
+                } else {
+                    delete menu.dataset.genderMenu;
+                }
             });
         }
 
         function lockConfidenceInput() {
-            hostDocument.querySelectorAll(selector).forEach((input) => {
+            hostDocument.querySelectorAll(lockedSelectSelector).forEach((input) => {
                 input.readOnly = true;
                 input.setAttribute('inputmode', 'none');
-                if (input.dataset.confidenceTypingLocked === 'true') return;
+                if (input.dataset.selectTypingLocked === 'true') return;
 
-                input.dataset.confidenceTypingLocked = 'true';
+                input.dataset.selectTypingLocked = 'true';
                 input.addEventListener('beforeinput', (event) => event.preventDefault());
                 input.addEventListener('keydown', (event) => {
                     if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete') {
@@ -165,7 +189,7 @@ def disable_risk_confidence_typing() -> None:
                     }
                 });
             });
-            markConfidenceMenu();
+            markSelectMenu();
         }
 
         lockConfidenceInput();
@@ -379,6 +403,67 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             key=f"marital_status_{client_id}_{version}",
             format_func=lambda option: option or "Select marital status",
         ) or None
+
+    with st.container(key=f"identity_details_{client_id}_{version}"):
+        gender_col, pronouns_col = st.columns(2)
+        current_gender = (profile.get("gender") or "").strip()
+        gender_options = [""] + GENDER_OPTIONS
+        if current_gender and current_gender not in gender_options:
+            gender_options.append(current_gender)
+
+        profile["gender"] = gender_col.selectbox(
+            "Gender",
+            gender_options,
+            index=gender_options.index(current_gender),
+            key=f"gender_{client_id}_{version}",
+            format_func=lambda option: option or "Gender",
+            label_visibility="collapsed",
+        ) or None
+        profile["pronouns"] = pronouns_col.text_input(
+            "Pronouns",
+            value=profile.get("pronouns") or "",
+            key=f"pronouns_{client_id}_{version}",
+            placeholder="Pronouns",
+            label_visibility="collapsed",
+        ) or None
+        gender_label = str(profile["gender"] or "Gender")
+        gender_label = (
+            gender_label.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("<", "\\3c ")
+            .replace("\r", " ")
+            .replace("\n", " ")
+        )
+        st.markdown(
+            f"""
+            <style>
+            .st-key-gender_{client_id}_{version} [data-baseweb="select"] > div {{
+                position: relative;
+            }}
+            .st-key-gender_{client_id}_{version}
+            [data-baseweb="select"] > div > div:first-child {{
+                opacity: 0;
+            }}
+            .st-key-gender_{client_id}_{version} [data-baseweb="select"] > div::before {{
+                content: "{gender_label}";
+                position: absolute;
+                left: 0.5rem;
+                right: 1.5rem;
+                top: 50%;
+                transform: translateY(-50%);
+                z-index: 2;
+                overflow: hidden;
+                color: var(--text-color, CanvasText);
+                font-size: 0.7rem;
+                line-height: 1.25rem;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                pointer-events: none;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
     c4, c5 = st.columns(2)
     with c4:
@@ -721,6 +806,79 @@ def main() -> None:
         [data-testid="stSelectboxVirtualDropdown"][data-risk-confidence-menu="true"] [role="option"],
         [data-testid="stSelectboxVirtualDropdown"][data-risk-confidence-menu="true"] [role="option"] * {
             font-size: 0.72rem;
+        }
+        [data-testid="stSelectboxVirtualDropdown"][data-gender-menu="true"] [role="option"],
+        [data-testid="stSelectboxVirtualDropdown"][data-gender-menu="true"] [role="option"] * {
+            font-size: 0.7rem;
+        }
+
+        /* Fit gender and pronouns into the existing gap below Name. */
+        [class*="st-key-identity_details_"] {
+            width: calc((100% - 3rem) / 4);
+            margin-top: -1.35rem;
+            margin-bottom: -0.9rem;
+            position: relative;
+            z-index: 2;
+        }
+        [class*="st-key-identity_details_"] [data-testid="stHorizontalBlock"] {
+            gap: 0.35rem;
+        }
+        [class*="st-key-identity_details_"] [data-testid="stColumn"] {
+            width: calc((100% - 0.35rem) / 2);
+            min-width: 0;
+            flex: 0 0 calc((100% - 0.35rem) / 2);
+        }
+        [class*="st-key-identity_details_"] [data-baseweb="select"],
+        [class*="st-key-identity_details_"] [data-baseweb="input"] {
+            width: 100%;
+            min-height: 1.75rem;
+            height: 1.75rem;
+            box-sizing: border-box;
+            background-color: transparent !important;
+        }
+        [class*="st-key-identity_details_"] .stSelectbox [data-baseweb="select"] > div,
+        [class*="st-key-identity_details_"] .stTextInput [data-baseweb="input"],
+        [class*="st-key-identity_details_"] .stTextInput [data-baseweb="input"] > div,
+        [class*="st-key-identity_details_"] .stTextInput input {
+            background-color: transparent !important;
+        }
+        [class*="st-key-identity_details_"] [data-baseweb="select"] > div,
+        [class*="st-key-identity_details_"] input {
+            min-height: 1.75rem;
+            height: 1.75rem;
+            box-sizing: border-box;
+            background-color: transparent !important;
+            font-size: 0.7rem;
+            line-height: 1.25rem;
+        }
+        [class*="st-key-identity_details_"] [data-baseweb="select"] * {
+            font-size: 0.7rem;
+            line-height: 1.25rem;
+        }
+        [class*="st-key-identity_details_"]
+        [data-baseweb="select"] > div > div:first-child {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            color: var(--text-color, CanvasText) !important;
+            overflow: visible;
+        }
+        [class*="st-key-identity_details_"]
+        [data-baseweb="select"] > div > div:first-child > div:first-child {
+            display: block !important;
+            color: var(--text-color, CanvasText) !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            white-space: nowrap;
+        }
+        [class*="st-key-identity_details_"] .stSelectbox input {
+            color: var(--text-color, CanvasText) !important;
+            -webkit-text-fill-color: var(--text-color, CanvasText) !important;
+            opacity: 1 !important;
+        }
+        [class*="st-key-identity_details_"] .stSelectbox,
+        [class*="st-key-identity_details_"] .stTextInput {
+            margin: 0;
         }
         </style>
         """,

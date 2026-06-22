@@ -123,6 +123,31 @@ def _extract_name(text: str) -> Optional[str]:
     )
 
 
+def _extract_gender(text: str) -> Optional[str]:
+    value = _line_value(text, "Gender")
+    if not value:
+        return None
+
+    aliases = {
+        "female": "Female",
+        "woman": "Female",
+        "male": "Male",
+        "man": "Male",
+        "nonbinary": "Non-binary",
+        "non-binary": "Non-binary",
+        "prefer not to say": "Prefer not to say",
+    }
+    normalised = re.sub(r"\s+", " ", value).strip().lower()
+    return aliases.get(normalised, value)
+
+
+def _extract_pronouns(text: str) -> Optional[str]:
+    return _line_value(text, "Pronouns") or _first_match(
+        text,
+        [r"\bpronouns?\s+(?:are|is)\s+([^\n.,;]+(?:/[^\n.,;]+)?)"],
+    )
+
+
 def calculate_age(date_of_birth: str, as_of: Optional[date] = None) -> Optional[int]:
     """Calculate age from an ISO date of birth, accounting for the birthday."""
     try:
@@ -549,6 +574,8 @@ def local_extract_kyc_profile(raw_text: str, client_id: str = "new_client") -> D
     return {
         "client_id": client_id,
         "name": _extract_name(text),
+        "gender": _extract_gender(text),
+        "pronouns": _extract_pronouns(text),
         "date_of_birth": date_of_birth,
         "age": _extract_age(text, date_of_birth),
         "occupation": _extract_occupation(text),

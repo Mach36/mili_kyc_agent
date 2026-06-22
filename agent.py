@@ -46,6 +46,8 @@ The final JSON should follow this shape:
 {
   "client_id": "...",
   "name": "...",
+  "gender": "...",
+  "pronouns": "...",
   "date_of_birth": "YYYY-MM-DD",
   "age": 0,
   "occupation": "...",

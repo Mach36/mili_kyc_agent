@@ -13,6 +13,8 @@ class EvidenceField(BaseModel):
 class ClientProfile(BaseModel):
     client_id: str
     name: Optional[str] = None
+    gender: Optional[str] = None
+    pronouns: Optional[str] = None
     date_of_birth: Optional[str] = None
     age: Optional[int] = None
     occupation: Optional[str] = None

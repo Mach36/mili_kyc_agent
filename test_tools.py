@@ -3,6 +3,21 @@ import unittest
 from tools import local_extract_kyc_profile
 
 
+class IdentityExtractionTests(unittest.TestCase):
+    def test_extracts_gender_and_pronouns_from_labelled_fields(self):
+        profile = local_extract_kyc_profile(
+            "Client name: Alex Morgan\nGender: Non-binary\nPronouns: they/them"
+        )
+
+        self.assertEqual(profile["gender"], "Non-binary")
+        self.assertEqual(profile["pronouns"], "they/them")
+
+    def test_extracts_pronouns_from_sentence(self):
+        profile = local_extract_kyc_profile("The client's pronouns are she/her.")
+
+        self.assertEqual(profile["pronouns"], "she/her")
+
+
 class MaritalStatusExtractionTests(unittest.TestCase):
     def test_infers_married_from_wife_dependent(self):
         profile = local_extract_kyc_profile("Dependents: Wife, one son")
