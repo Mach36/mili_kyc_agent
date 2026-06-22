@@ -693,6 +693,15 @@ def _completion_score(
     return max(0, min(100, score))
 
 
+def calculate_profile_completion(profile: Dict[str, Any]) -> int:
+    """Calculate completion from the profile's current advisor-edited values."""
+    return _completion_score(
+        profile,
+        list(profile.get("missing_information") or []),
+        list(profile.get("contradictions") or []),
+    )
+
+
 # -----------------------------
 # Local logic used by tools
 # -----------------------------

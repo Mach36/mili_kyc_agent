@@ -1,7 +1,33 @@
 import unittest
 
 from sample_data import PRIYA_DISCOVERY_CALL_SAMPLE, PRIYA_FOLLOW_UP_SAMPLE
-from tools import local_extract_kyc_profile
+from tools import calculate_profile_completion, local_extract_kyc_profile
+
+
+class ProfileCompletionTests(unittest.TestCase):
+    def test_score_uses_current_form_values(self):
+        profile = {
+            "name": None,
+            "missing_information": [],
+            "contradictions": [],
+        }
+
+        empty_score = calculate_profile_completion(profile)
+        profile["name"] = "Alex Morgan"
+
+        self.assertEqual(calculate_profile_completion(profile), empty_score + 5)
+
+    def test_score_decreases_when_form_value_is_removed(self):
+        profile = {
+            "income": "INR 20 lakh",
+            "missing_information": [],
+            "contradictions": [],
+        }
+
+        filled_score = calculate_profile_completion(profile)
+        profile["income"] = None
+
+        self.assertEqual(calculate_profile_completion(profile), filled_score - 10)
 
 
 class IdentityExtractionTests(unittest.TestCase):

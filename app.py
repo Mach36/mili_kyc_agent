@@ -18,7 +18,7 @@ from sample_data import (
     seed_clients,
 )
 from text_upload import decode_text_upload
-from tools import calculate_age, merge_kyc_profiles
+from tools import calculate_age, calculate_profile_completion, merge_kyc_profiles
 
 # st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 APP_TITLE = "Mili KYC Agent"
@@ -363,7 +363,6 @@ def update_kyc_review_status(client_id: str, widget_key: str) -> None:
 
 def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
     profile = client["profile"]
-    score = profile.get("completion_score", 0)
     version = st.session_state.profile_editor_version
 
     title_col, review_col = st.columns([4, 1])
@@ -379,7 +378,8 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             args=(client_id, review_key),
             help="Mark this client's KYC profile as reviewed by the advisor.",
         )
-    st.progress(min(100, int(score)) / 100, text=f"Profile completion: {score}%")
+    with st.container(key=f"profile_completion_{client_id}"):
+        score_placeholder = st.empty()
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -658,6 +658,25 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
                 height=PROFILE_TEXT_AREA_HEIGHT,
                 key=f"confidence_notes_{client_id}_{version}",
             ))
+
+    score = calculate_profile_completion(profile)
+    profile["completion_score"] = score
+    score_placeholder.progress(
+        score / 100,
+        text=f"Profile completion: {score}%",
+    )
+    if score == 100:
+        st.markdown(
+            f"""
+            <style>
+            .st-key-profile_completion_{client_id}
+            [data-baseweb="progress-bar"] > div > div > div {{
+                background-color: #16a34a !important;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def render_documents(client: Dict[str, Any]) -> None:
