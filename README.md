@@ -1,67 +1,153 @@
 # Mili Client Onboarding & KYC Agent
 
-A Streamlit prototype for wealth advisors to convert unstructured onboarding inputs into a structured, reviewable KYC profile.
+A Streamlit prototype that helps wealth advisors turn unstructured onboarding
+notes into a structured, editable, and reviewable KYC profile.
 
-## Why this agent
+The agent extracts client details, highlights missing or contradictory
+information, and suggests targeted follow-up questions. It supports both an
+OpenAI Agents SDK workflow and a deterministic local demo mode, so the full UI
+can be explored without an API key.
 
-I chose the Client Onboarding & KYC Agent because onboarding is a high-friction workflow at the start of the advisor-client relationship. Advisors often receive fragmented inputs through intake forms, meeting notes, emails, chat transcripts, and documents. The agent helps extract a structured profile, identify missing or contradictory information, and generate targeted follow-up questions.
+> This is an advisor-assistance prototype, not a production KYC approval or
+> investment-suitability system. An advisor must review and confirm all output.
 
-## Product flow
+## Features
 
-1. Advisor selects an existing client from the sidebar or creates a new client.
-2. Advisor reviews the current KYC profile.
-3. Advisor adds, edits, or removes onboarding documents.
-4. Advisor runs the KYC agent.
-5. The app updates the profile and shows missing fields, contradictions, confidence notes, and follow-up questions.
-6. Advisor can inspect and download the underlying JSON.
+- Seeded client records plus support for creating new clients
+- Editable identity, financial, goal, risk, and time-horizon fields
+- Pasted onboarding notes and `.txt` document uploads
+- Multiple active or inactive documents per client
+- Extraction of a structured KYC profile from unstructured text
+- Completeness scoring, contradiction detection, and confidence notes
+- Advisor-ready follow-up questions for unresolved information
+- Inspectable and downloadable client JSON
+- In-memory session state with no external database required
 
-Removing a document does not erase already-filled KYC fields. This is intentional because an advisor may have already reviewed or confirmed those fields.
+## How it works
 
-## Agent tools
+The agent runs three tools in sequence:
 
-The app uses three tool boundaries:
+1. `extract_kyc_profile` converts active document text into structured fields.
+2. `validate_kyc_completeness` identifies gaps, contradictions, confidence
+   concerns, and a completion score.
+3. `generate_follow_up_questions` creates questions for the advisor to ask next.
 
-- `extract_kyc_profile`: extracts structured KYC details from raw onboarding text.
-- `validate_kyc_completeness`: checks missing fields, contradictions, and confidence notes.
-- `generate_follow_up_questions`: creates targeted questions for the advisor to ask the client.
+New results are merged into the existing profile without allowing empty values
+to erase previously captured or advisor-reviewed information. Removing a
+document therefore does not automatically remove fields already added to the
+profile.
 
-The app includes a local deterministic fallback so the UI can be demonstrated even without an API key. With `OPENAI_API_KEY` configured and `USE_LOCAL_DEMO=false`, it runs the OpenAI Agents SDK workflow.
+## Quick start
 
-## Setup
+### 1. Create an environment
+
+Python 3.9 or later is recommended.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+On Windows, activate the environment with:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+### 2. Configure the agent
+
+Copy the example environment file:
+
+```bash
 cp .env.example .env
 ```
 
-Add your OpenAI API key to `.env`.
+The app works without an API key and automatically uses its local deterministic
+fallback. To use the OpenAI Agents SDK, set `OPENAI_API_KEY` in `.env`:
 
-## Run
+```dotenv
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4.1-mini
+USE_LOCAL_DEMO=false
+```
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | No | Enables the OpenAI Agents SDK workflow when present. |
+| `OPENAI_MODEL` | No | Model used by the SDK workflow. Defaults to `gpt-4.1-mini`. |
+| `USE_LOCAL_DEMO` | No | Set to `true` to force deterministic local processing. |
+
+### 3. Run the app
 
 ```bash
 streamlit run app.py
 ```
 
-## What is mocked
+Streamlit will print the local URL, typically `http://localhost:8501`.
 
-- Client data is stored in Streamlit session state.
-- Documents are stored in session state, not a secure document store.
-- Only pasted text and `.txt` upload are supported in this v1.
-- KYC/completeness checks are simplified and rule-based inside the tools.
+## Using the app
 
-## Known limitations
+1. Select a seeded client from the sidebar or create a new client.
+2. Review or edit the current profile in **Client profile**.
+3. Add, edit, activate, or remove source material in **Documents & agent**.
+4. Click **Run KYC Agent** to process all active documents.
+5. Review the updated fields, flags, confidence notes, and follow-up questions.
+6. Inspect or download the full record from **Underlying JSON**.
 
-- No authentication or database persistence.
-- No scanned PDF/OCR support.
-- Not a production KYC approval system.
-- The agent does not approve/reject clients or make suitability decisions.
+The document form includes contradictory and incomplete sample inputs for a
+quick demonstration.
 
-## Future improvements
+## Execution modes
 
-- Secure database and document storage.
-- PDF parsing and OCR.
-- CRM integration.
-- Advisor approval workflow and audit trail.
-- More robust validation rules by jurisdiction and firm policy.
+| Mode shown in the UI | Meaning |
+| --- | --- |
+| `openai_agents_sdk` | The OpenAI Agents SDK completed the workflow. |
+| `local_fallback_no_api_key` | No API key was configured, so local rules were used. |
+| `local_fallback` | Local mode was explicitly enabled. |
+| `local_fallback_after_sdk_error` | The SDK failed and the app recovered locally. |
+
+When an SDK error triggers the fallback, the app displays the reason below the
+agent run controls.
+
+## Tests
+
+Run the unit tests with:
+
+```bash
+python -m unittest discover -v
+```
+
+The tests cover local identity and marital-status extraction, explicit local
+mode selection, and profile merging without duplicated semantic facts.
+
+## Project structure
+
+| File | Purpose |
+| --- | --- |
+| `app.py` | Streamlit UI, client/session state, document management, and profile editing |
+| `agent.py` | Agent orchestration, mode selection, response parsing, and fallback handling |
+| `tools.py` | Extraction, validation, follow-up generation, and profile merging |
+| `schemas.py` | Pydantic models for structured KYC data |
+| `sample_data.py` | Seeded clients and demonstration onboarding text |
+| `test_agent.py` | Agent mode and merge-behavior tests |
+| `test_tools.py` | Deterministic extraction tests |
+
+## Prototype boundaries
+
+- Client records and documents live only in Streamlit session state.
+- Only pasted text and UTF-8-compatible `.txt` uploads are supported.
+- Local extraction and validation use simplified rules, not firm- or
+  jurisdiction-specific KYC policy.
+- There is no authentication, encrypted storage, audit trail, OCR, or CRM
+  integration.
+- The agent does not approve or reject clients, recommend investments, or make
+  final suitability decisions.
+
+## Possible next steps
+
+- Add secure persistence and role-based access controls.
+- Support PDF parsing, OCR, and document provenance.
+- Add jurisdiction- and firm-specific validation policies.
+- Integrate with CRM and portfolio systems.
+- Add advisor approvals, field-level audit history, and monitoring.
