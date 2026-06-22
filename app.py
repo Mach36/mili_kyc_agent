@@ -146,70 +146,6 @@ def text_to_list(value: str) -> List[str]:
     return [line.strip(" -•\t") for line in value.splitlines() if line.strip(" -•\t")]
 
 
-def render_dependents_editor(profile: Dict[str, Any], client_id: str, version: int) -> None:
-    """Render dependents as individual editable rows."""
-    st.markdown("**Dependents**")
-    dependents = profile.get("dependents", []) or []
-    if not isinstance(dependents, list):
-        dependents = []
-
-    updated_dependents: List[str] = []
-    remove_index = None
-
-    if not dependents:
-        st.info("No dependents captured yet.")
-
-    for index, dependent in enumerate(dependents):
-        dependent_col, action_col = st.columns([3.7, 0.7])
-        value = dependent_col.text_input(
-            "Dependent",
-            value=str(dependent or ""),
-            key=f"dependent_{client_id}_{version}_{index}",
-            label_visibility="collapsed",
-            placeholder="e.g. Daughter, age 12",
-        )
-        with action_col:
-            if st.button(
-                "Remove",
-                key=f"dependent_remove_{client_id}_{version}_{index}",
-            ):
-                remove_index = index
-
-        if remove_index != index and value.strip():
-            updated_dependents.append(value.strip())
-
-    new_dependent_col, add_col = st.columns([3.7, 0.7])
-    new_dependent = new_dependent_col.text_input(
-        "Add dependent",
-        key=f"dependent_new_{client_id}_{version}",
-        label_visibility="collapsed",
-        placeholder="Add a dependent",
-    )
-    with add_col:
-        add_clicked = st.button(
-            "Add",
-            key=f"dependent_add_{client_id}_{version}",
-        )
-
-    if remove_index is not None:
-        profile["dependents"] = updated_dependents
-        st.session_state.profile_editor_version += 1
-        st.rerun()
-
-    if add_clicked:
-        value = new_dependent.strip()
-        if not value:
-            st.warning("Enter a dependent before adding.")
-        elif value.casefold() in {item.casefold() for item in updated_dependents}:
-            st.warning("That dependent is already listed.")
-        else:
-            profile["dependents"] = [*updated_dependents, value]
-            st.session_state.profile_editor_version += 1
-            st.rerun()
-
-    profile["dependents"] = updated_dependents
-
-
 def normalise_time_horizon_key(value: str) -> str:
     """Convert an advisor-facing label into a stable JSON key."""
     cleaned = (value or "").strip().lower()
@@ -595,6 +531,12 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
                 height=PROFILE_TEXT_AREA_HEIGHT,
                 key=f"liquidity_{client_id}_{version}",
             ))
+            profile["dependents"] = text_to_list(st.text_area(
+                "Dependents",
+                value=list_to_text(profile.get("dependents", [])),
+                height=PROFILE_TEXT_AREA_HEIGHT,
+                key=f"dependents_{client_id}_{version}",
+            ))
         with right:
             profile["assets"] = text_to_list(st.text_area(
                 "Assets",
@@ -608,7 +550,6 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
                 height=PROFILE_TEXT_AREA_HEIGHT,
                 key=f"liabilities_{client_id}_{version}",
             ))
-        render_dependents_editor(profile, client_id, version)
         render_time_horizon_editor(profile, client_id, version)
 
     with st.expander("Review flags", expanded=True):
