@@ -23,17 +23,19 @@ class ProfileEditorTests(unittest.TestCase):
         self.assertEqual(selected_profile["name"], "UI Test Client")
         self.assertFalse(app.exception)
 
-    def test_review_checkbox_persists_client_status(self):
+    def test_review_action_persists_client_status_and_can_reopen(self):
         app = AppTest.from_file("app.py", default_timeout=15).run()
         selected_client_id = app.session_state["selected_client_id"]
         original_name = app.session_state["clients"][selected_client_id]["profile"][
             "name"
         ]
-        review_checkbox = next(
-            widget for widget in app.checkbox if widget.label == "KYC review"
+        complete_button = next(
+            widget
+            for widget in app.button
+            if widget.key == f"complete_kyc_review_{selected_client_id}"
         )
 
-        review_checkbox.check().run()
+        complete_button.click().run()
 
         self.assertTrue(
             app.session_state["clients"][selected_client_id]["kyc_reviewed"]
@@ -41,6 +43,15 @@ class ProfileEditorTests(unittest.TestCase):
         self.assertEqual(
             app.session_state["clients"][selected_client_id]["profile"]["name"],
             original_name,
+        )
+        reopen_button = next(
+            widget
+            for widget in app.button
+            if widget.key == f"reopen_kyc_review_{selected_client_id}"
+        )
+        reopen_button.click().run()
+        self.assertFalse(
+            app.session_state["clients"][selected_client_id]["kyc_reviewed"]
         )
         self.assertFalse(app.exception)
 

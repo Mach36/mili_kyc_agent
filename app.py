@@ -721,28 +721,47 @@ def render_sidebar() -> None:
             st.rerun()
 
 
-def update_kyc_review_status(client_id: str, widget_key: str) -> None:
-    """Persist review status before Streamlit redraws the sidebar."""
-    st.session_state.clients[client_id]["kyc_reviewed"] = bool(st.session_state[widget_key])
-
-
 def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
     profile = client["profile"]
     version = st.session_state.profile_editor_version
+    is_reviewed = bool(client.get("kyc_reviewed", False))
 
-    title_col, review_col = st.columns([4, 1])
+    title_col, review_col = st.columns([4, 1], vertical_alignment="center")
     with title_col:
         st.subheader("KYC Profile", anchor=False)
     with review_col:
-        review_key = f"kyc_reviewed_{client_id}"
-        st.checkbox(
-            "KYC review",
-            value=bool(client.get("kyc_reviewed", False)),
-            key=review_key,
-            on_change=update_kyc_review_status,
-            args=(client_id, review_key),
-            help="Mark this client's KYC profile as reviewed by the advisor.",
+        status_label = "Review complete" if is_reviewed else "Review incomplete"
+        status_class = "complete" if is_reviewed else "incomplete"
+        st.markdown(
+            f'<div class="kyc-review-status {status_class}">{status_label}</div>',
+            unsafe_allow_html=True,
         )
+    st.markdown(
+        """
+        <style>
+        .kyc-review-status {
+            width: fit-content;
+            margin-left: auto;
+            padding: 0.22rem 0.65rem;
+            border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            line-height: 1.25rem;
+            white-space: nowrap;
+        }
+        .kyc-review-status.complete {
+            border-color: color-mix(in srgb, #16a34a 35%, transparent);
+            background: color-mix(in srgb, #16a34a 12%, transparent);
+            color: #15803d;
+        }
+        .kyc-review-status.incomplete {
+            opacity: 0.68;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     with st.container(key=f"profile_completion_{client_id}"):
         score_placeholder = st.empty()
 
@@ -1023,6 +1042,35 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
                 height=PROFILE_TEXT_AREA_HEIGHT,
                 key=f"confidence_notes_{client_id}_{version}",
             ))
+
+    st.divider()
+    review_note_col, review_action_col = st.columns([3, 1], vertical_alignment="center")
+    with review_note_col:
+        st.caption(
+            "KYC review is complete." if is_reviewed
+            else "Confirm once all profile details and review flags have been checked."
+        )
+    with review_action_col:
+        action_label = "Reopen review" if is_reviewed else "Mark review complete"
+        action_key = (
+            f"reopen_kyc_review_{client_id}"
+            if is_reviewed
+            else f"complete_kyc_review_{client_id}"
+        )
+        if st.button(
+            action_label,
+            key=action_key,
+            type="secondary" if is_reviewed else "primary",
+            use_container_width=True,
+        ):
+            st.session_state.clients[client_id]["kyc_reviewed"] = not is_reviewed
+            toast_message = (
+                "KYC review reopened"
+                if is_reviewed
+                else "KYC review marked complete"
+            )
+            st.toast(toast_message)
+            st.rerun()
 
     score = calculate_profile_completion(profile)
     profile["completion_score"] = score
