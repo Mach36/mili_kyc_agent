@@ -25,25 +25,294 @@ from tools import (
     normalise_profile_list,
 )
 
-# st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 APP_TITLE = "Mili KYC Agent"
 
 st.set_page_config(page_title=APP_TITLE, page_icon="🧾", layout="wide")
 
-st.markdown(
-    f"""
-    <style>
-    [data-testid="stHeader"] [data-testid="stToolbar"] > div > div:first-child::after {{
-        content: "{APP_TITLE}";
-        margin-left: 60%;
-        font-size: 1.125rem;
-        font-weight: 600;
-        white-space: nowrap;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
+def apply_global_styles() -> None:
+    """Apply the app's visual system without changing Streamlit interactions."""
+    st.markdown(
+        f"""
+        <style>
+        :root {{
+            --mili-navy: #142b4a;
+            --mili-blue: #246b83;
+            --mili-teal: #20a39e;
+            --mili-mint: #e8f7f5;
+            --mili-selected: light-dark(#eaf1f8, #1d3048);
+            --mili-surface: light-dark(#ffffff, #172033);
+            --mili-surface-soft: light-dark(#f5f8fb, #111827);
+            --mili-border: light-dark(#dce5ed, #334155);
+            --mili-text: light-dark(#172033, #f1f5f9);
+            --mili-muted: light-dark(#607086, #a8b4c5);
+            --mili-shadow: 0 10px 28px rgba(20, 43, 74, 0.08);
+            --mili-radius: 0.75rem;
+        }}
+
+        .stApp {{
+            color: var(--mili-text);
+            background:
+                radial-gradient(circle at 88% 0%, rgba(32, 163, 158, 0.08), transparent 24rem),
+                var(--mili-surface-soft);
+        }}
+
+        [data-testid="stHeader"] {{
+            background: color-mix(in srgb, var(--mili-surface) 90%, transparent);
+            border-bottom: 1px solid var(--mili-border);
+            backdrop-filter: blur(12px);
+        }}
+        [data-testid="stHeader"] [data-testid="stToolbar"] > div > div:first-child::after {{
+            content: "{APP_TITLE}";
+            margin-left: 1rem;
+            color: var(--mili-navy);
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
+        }}
+
+        .block-container {{
+            max-width: 86rem;
+            padding-top: 2.25rem;
+            padding-bottom: 3rem;
+        }}
+        .block-container h1 {{
+            margin-bottom: 0.2rem;
+            color: var(--mili-navy);
+            font-size: clamp(2rem, 3vw, 2.8rem);
+            font-weight: 750;
+            letter-spacing: -0.035em;
+        }}
+        .block-container h2,
+        .block-container h3 {{
+            color: var(--mili-navy);
+            letter-spacing: -0.015em;
+        }}
+        .mili-eyebrow {{
+            display: block;
+            margin: 0 0 0.3rem;
+            padding-top: 0.35rem;
+            color: var(--mili-blue);
+            font-size: 0.72rem;
+            font-weight: 750;
+            letter-spacing: 0.12em;
+            line-height: 1.4;
+            overflow: visible;
+            text-transform: uppercase;
+        }}
+        [data-testid="stMarkdownContainer"]:has(> .mili-eyebrow) {{
+            overflow: visible;
+        }}
+
+        [data-testid="stSidebar"] {{
+            background: light-dark(#f8fbfd, #111827);
+            border-right: 1px solid var(--mili-border);
+        }}
+        [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
+            padding-top: 1rem;
+        }}
+        [data-testid="stSidebar"] h1 {{
+            color: var(--mili-navy);
+            font-size: 1.35rem;
+            letter-spacing: -0.02em;
+        }}
+        [data-testid="stSidebar"] h3 {{
+            margin-top: 1rem;
+            color: var(--mili-muted);
+            font-size: 0.72rem;
+            font-weight: 750;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }}
+        [data-testid="stSidebar"] .stButton > button {{
+            justify-content: flex-start;
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+            font-weight: 600;
+        }}
+        [data-testid="stSidebar"] .stButton > button:hover {{
+            border-color: rgba(32, 163, 158, 0.35);
+            background: var(--mili-mint);
+            color: var(--mili-navy);
+        }}
+        .st-key-new_client_panel {{
+            margin-top: 0.35rem;
+            padding: 0 0.15rem;
+        }}
+        .st-key-new_client_panel h3 {{
+            margin: 0 0 0.15rem;
+            color: var(--mili-muted);
+            font-size: 0.72rem;
+            letter-spacing: 0.09em;
+        }}
+        .st-key-new_client_panel label,
+        .st-key-new_client_panel label p {{
+            color: var(--mili-muted) !important;
+            font-size: 0.78rem !important;
+            font-weight: 600 !important;
+        }}
+        .st-key-new_client_panel [data-testid="stVerticalBlock"] {{
+            gap: 0.55rem;
+        }}
+        .st-key-new_client_panel .stTextInput,
+        .st-key-new_client_panel .stButton {{
+            margin: 0;
+        }}
+        [class*="st-key-new_client_name_"] [data-baseweb="input"] {{
+            min-height: 2.35rem;
+            height: 2.35rem;
+            border: 1px solid var(--mili-border) !important;
+            border-radius: 0.55rem !important;
+            background: var(--mili-surface) !important;
+            box-shadow: none !important;
+        }}
+        [class*="st-key-new_client_name_"] input {{
+            min-height: 2.25rem;
+            height: 2.25rem;
+            padding-inline: 0.7rem;
+            border: 0 !important;
+            background: transparent !important;
+            color: var(--mili-text) !important;
+        }}
+        [class*="st-key-new_client_name_"] [data-baseweb="input"]:focus-within {{
+            border-color: var(--mili-blue) !important;
+            box-shadow: 0 0 0 1px var(--mili-blue) !important;
+        }}
+        .st-key-create_client button {{
+            min-height: 2.35rem !important;
+            justify-content: center !important;
+            margin: 0 !important;
+            border-color: #246b83 !important;
+            border-radius: 0.55rem !important;
+            background: #246b83 !important;
+            color: #ffffff !important;
+            box-shadow: none !important;
+            font-size: 0.82rem;
+        }}
+        .st-key-create_client button:hover {{
+            border-color: #1d596d !important;
+            background: #1d596d !important;
+            color: #ffffff !important;
+            transform: none;
+            box-shadow: none !important;
+        }}
+
+        .stTextInput input,
+        .stTextArea textarea,
+        .stDateInput input,
+        [data-baseweb="select"] > div {{
+            border-color: var(--mili-border) !important;
+            border-radius: 0.625rem !important;
+            background-color: var(--mili-surface) !important;
+        }}
+        .stTextInput input:focus,
+        .stTextArea textarea:focus,
+        .stDateInput input:focus {{
+            border-color: var(--mili-teal) !important;
+            box-shadow: 0 0 0 1px var(--mili-teal) !important;
+        }}
+        .stTextArea textarea {{
+            line-height: 1.55;
+        }}
+        .stButton > button,
+        .stDownloadButton > button {{
+            min-height: 2.5rem;
+            border-radius: 0.625rem;
+            font-weight: 650;
+            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+        }}
+        .stButton > button:hover,
+        .stDownloadButton > button:hover {{
+            border-color: var(--mili-teal);
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(20, 43, 74, 0.1);
+        }}
+        .stButton > button[kind="primary"] {{
+            border-color: var(--mili-blue);
+            background: linear-gradient(135deg, var(--mili-navy), var(--mili-blue));
+            box-shadow: 0 7px 18px rgba(20, 43, 74, 0.18);
+        }}
+
+        [data-testid="stExpander"] {{
+            overflow: hidden;
+            border: 1px solid var(--mili-border);
+            border-radius: var(--mili-radius);
+            background: var(--mili-surface);
+            box-shadow: 0 4px 15px rgba(20, 43, 74, 0.04);
+        }}
+        [data-testid="stExpander"] summary {{
+            font-weight: 700;
+        }}
+        [data-testid="stAlert"] {{
+            border-radius: var(--mili-radius);
+        }}
+        [data-testid="stProgress"] > div > div {{
+            height: 0.55rem;
+            border-radius: 999px;
+        }}
+        [data-testid="stProgress"] [data-baseweb="progress-bar"] > div > div > div {{
+            background: linear-gradient(90deg, var(--mili-blue), var(--mili-teal));
+        }}
+
+        [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {{
+            position: sticky;
+            top: 3.75rem;
+            z-index: 1000;
+            isolation: isolate;
+            margin: 1rem 0 1.25rem;
+            padding: 0.35rem;
+            border: 1px solid var(--mili-border);
+            border-radius: var(--mili-radius);
+            background: color-mix(in srgb, var(--mili-surface) 94%, transparent);
+            box-shadow: var(--mili-shadow);
+            backdrop-filter: blur(12px);
+        }}
+        [data-baseweb="tab-list"] {{
+            gap: 0.3rem;
+        }}
+        [data-baseweb="tab"] {{
+            height: 2.65rem;
+            padding: 0 1rem;
+            border-radius: 0.5rem;
+            color: var(--mili-muted);
+            font-weight: 650;
+        }}
+        [data-baseweb="tab"][aria-selected="true"] {{
+            background: var(--mili-mint);
+            color: var(--mili-navy);
+        }}
+
+        hr {{
+            border-color: var(--mili-border) !important;
+        }}
+        [data-testid="stCaptionContainer"] {{
+            color: var(--mili-muted);
+        }}
+
+        @media (max-width: 760px) {{
+            .block-container {{
+                padding-top: 1.5rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }}
+            [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {{
+                top: 3.25rem;
+                margin-top: 0.75rem;
+            }}
+            [data-baseweb="tab"] {{
+                padding: 0 0.75rem;
+                font-size: 0.82rem;
+            }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+apply_global_styles()
 
 
 PROFILE_FIELDS = [
@@ -318,26 +587,54 @@ def render_sidebar() -> None:
     st.sidebar.title("Advisor Workspace")
 
     st.sidebar.subheader("Clients")
+    selected_client_id = st.session_state.selected_client_id
     reviewed_client_ids = [
         client_id
         for client_id, record in st.session_state.clients.items()
         if record.get("kyc_reviewed", False)
     ]
-    if reviewed_client_ids:
-        reviewed_selectors = ",\n".join(
-            f".st-key-select_{client_id} button, .st-key-select_{client_id} button p"
-            for client_id in reviewed_client_ids
-        )
-        st.sidebar.html(
-            f"""
-            <style>
-            {reviewed_selectors} {{
-                color: #16a34a !important;
-                border-color: rgba(34, 197, 94, 0.55) !important;
-            }}
-            </style>
-            """,
-        )
+    reviewed_selectors = ",\n".join(
+        f".st-key-select_{client_id} button::after"
+        for client_id in reviewed_client_ids
+    )
+    reviewed_rule = (
+        f"""
+        {reviewed_selectors} {{
+            content: "\\2713";
+            display: inline-grid;
+            flex: 0 0 1.2rem;
+            width: 1.2rem;
+            height: 1.2rem;
+            margin-left: auto;
+            place-items: center;
+            border-radius: 999px;
+            background: #dcf7ef;
+            color: #137d69;
+            font-size: 0.75rem;
+            font-weight: 800;
+            line-height: 1;
+        }}
+        """
+        if reviewed_selectors
+        else ""
+    )
+    st.sidebar.html(
+        f"""
+        <style>
+        {reviewed_rule}
+        .st-key-select_{selected_client_id} button {{
+            border-color: rgba(36, 107, 131, 0.3) !important;
+            background: var(--mili-selected) !important;
+            color: var(--mili-navy) !important;
+            box-shadow: inset 3px 0 0 var(--mili-blue) !important;
+        }}
+        .st-key-select_{selected_client_id} button p {{
+            color: var(--mili-navy) !important;
+            font-weight: 750 !important;
+        }}
+        </style>
+        """,
+    )
 
     for client_id, record in st.session_state.clients.items():
         name = record["profile"].get("name") or "Unnamed client"
@@ -348,25 +645,35 @@ def render_sidebar() -> None:
                 st.rerun()
 
     st.sidebar.divider()
-    st.sidebar.subheader("Add new client")
+    with st.sidebar.container(key="new_client_panel"):
+        st.subheader("Add new client")
 
-    # Dynamic key ensures this input is cleared after client creation.
-    new_client_key = f"new_client_name_{st.session_state.new_client_input_version}"
-    new_name = st.sidebar.text_input("Client name", key=new_client_key)
+        # Dynamic key ensures this input is cleared after client creation.
+        new_client_key = f"new_client_name_{st.session_state.new_client_input_version}"
+        new_name = st.text_input(
+            "Client name",
+            key=new_client_key,
+            placeholder="Enter client name",
+        )
 
-    if st.sidebar.button("+ Create client", use_container_width=True):
-        clean_name = (new_name or "").strip()
-        client_id = f"client_{uuid.uuid4().hex[:8]}"
-        st.session_state.clients[client_id] = {
-            "client_id": client_id,
-            "profile": new_empty_profile(client_id, clean_name),
-            "documents": [],
-            "kyc_reviewed": False,
-        }
-        st.session_state.selected_client_id = client_id
-        st.session_state.new_client_input_version += 1
-        st.toast("New client created")
-        st.rerun()
+        if st.button(
+            "+ Create client",
+            key="create_client",
+            type="primary",
+            use_container_width=True,
+        ):
+            clean_name = (new_name or "").strip()
+            client_id = f"client_{uuid.uuid4().hex[:8]}"
+            st.session_state.clients[client_id] = {
+                "client_id": client_id,
+                "profile": new_empty_profile(client_id, clean_name),
+                "documents": [],
+                "kyc_reviewed": False,
+            }
+            st.session_state.selected_client_id = client_id
+            st.session_state.new_client_input_version += 1
+            st.toast("New client created")
+            st.rerun()
 
 
 def update_kyc_review_status(client_id: str, widget_key: str) -> None:
@@ -890,24 +1197,13 @@ def main() -> None:
     client = st.session_state.clients[client_id]
     profile = client["profile"]
 
+    st.markdown('<p class="mili-eyebrow">Advisor operations</p>', unsafe_allow_html=True)
     st.title("Client Onboarding & KYC Agent")
     st.caption("A prototype workspace for wealth advisors to manage onboarding documents and convert them into a structured, reviewable KYC profile.")
 
     st.markdown(
         """
         <style>
-        /* The tab list scrolls horizontally, so its row wrapper must be sticky. */
-        [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {
-            position: sticky;
-            top: 3.75rem;
-            z-index: 1000;
-            isolation: isolate;
-            background-color: Canvas;
-            background-color: light-dark(#ffffff, #0e1117);
-            box-shadow: 0 1px 0 color-mix(in srgb, CanvasText 18%, transparent),
-                        0 4px 8px color-mix(in srgb, CanvasText 6%, transparent);
-        }
-
         /* Match the document add control to the primary action while keeping it square. */
         .st-key-open_add_document button {
             width: 2rem;

@@ -6,6 +6,44 @@ from sample_data import INCOMPLETE_SAMPLE
 
 
 class ProfileEditorTests(unittest.TestCase):
+    def test_new_client_panel_still_creates_and_selects_client(self):
+        app = AppTest.from_file("app.py", default_timeout=15).run()
+        client_name = next(
+            widget for widget in app.text_input if widget.label == "Client name"
+        )
+
+        client_name.set_value("UI Test Client").run()
+        create_button = next(
+            widget for widget in app.button if widget.key == "create_client"
+        )
+        create_button.click().run()
+
+        selected_client_id = app.session_state["selected_client_id"]
+        selected_profile = app.session_state["clients"][selected_client_id]["profile"]
+        self.assertEqual(selected_profile["name"], "UI Test Client")
+        self.assertFalse(app.exception)
+
+    def test_review_checkbox_persists_client_status(self):
+        app = AppTest.from_file("app.py", default_timeout=15).run()
+        selected_client_id = app.session_state["selected_client_id"]
+        original_name = app.session_state["clients"][selected_client_id]["profile"][
+            "name"
+        ]
+        review_checkbox = next(
+            widget for widget in app.checkbox if widget.label == "KYC review"
+        )
+
+        review_checkbox.check().run()
+
+        self.assertTrue(
+            app.session_state["clients"][selected_client_id]["kyc_reviewed"]
+        )
+        self.assertEqual(
+            app.session_state["clients"][selected_client_id]["profile"]["name"],
+            original_name,
+        )
+        self.assertFalse(app.exception)
+
     def test_structured_dependent_from_agent_does_not_crash_editor(self):
         app = AppTest.from_file("app.py", default_timeout=15).run()
         selected_client_id = app.session_state["selected_client_id"]
