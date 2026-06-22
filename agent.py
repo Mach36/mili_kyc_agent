@@ -73,6 +73,11 @@ The final JSON should follow this shape:
 """
 
 
+def _env_flag(name: str) -> bool:
+    """Return True for common truthy environment-variable values."""
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _safe_json_loads(value: Any) -> Optional[Dict[str, Any]]:
     """
     Safely parse JSON from an agent response.
@@ -257,7 +262,9 @@ def run_kyc_agent(
 
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
 
-    if force_local or not api_key:
+    use_local_demo = force_local or _env_flag("USE_LOCAL_DEMO")
+
+    if use_local_demo or not api_key:
         profile = _local_fallback_run(
             raw_text=raw_text,
             client_id=client_id,
@@ -265,7 +272,7 @@ def run_kyc_agent(
         )
         return _wrap_result(
             profile,
-            mode="local_fallback" if force_local else "local_fallback_no_api_key",
+            mode="local_fallback" if use_local_demo else "local_fallback_no_api_key",
         )
 
     try:
