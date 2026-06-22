@@ -367,7 +367,7 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
 
     title_col, review_col = st.columns([4, 1])
     with title_col:
-        st.subheader("KYC Profile")
+        st.subheader("KYC Profile", anchor=False)
     with review_col:
         review_key = f"kyc_reviewed_{client_id}"
         st.checkbox(
@@ -679,13 +679,81 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
         )
 
 
+@st.dialog("Add document")
+def render_add_document_dialog(client: Dict[str, Any]) -> None:
+    input_version = st.session_state.document_input_version
+    sample_choice = st.selectbox(
+        "Use sample input",
+        [
+            "None",
+            "Contradictory sample - Priya",
+            "Incomplete sample - Kabir",
+            "Discovery call - Priya",
+            "Follow up - Priya",
+        ],
+        key=f"sample_choice_{input_version}",
+    )
+    default_text = ""
+    if sample_choice == "Contradictory sample - Priya":
+        default_text = NEW_CLIENT_SAMPLE
+    elif sample_choice == "Incomplete sample - Kabir":
+        default_text = INCOMPLETE_SAMPLE
+    elif sample_choice == "Discovery call - Priya":
+        default_text = PRIYA_DISCOVERY_CALL_SAMPLE
+    elif sample_choice == "Follow up - Priya":
+        default_text = PRIYA_FOLLOW_UP_SAMPLE
+
+    uploaded_file = st.file_uploader(
+        "Upload .txt file",
+        type=["txt"],
+        key=f"upload_file_{input_version}",
+    )
+    uploaded_text = ""
+    upload_token = "no_upload"
+    if uploaded_file is not None:
+        uploaded_bytes = uploaded_file.getvalue()
+        uploaded_text = decode_text_upload(uploaded_bytes)
+        upload_token = hashlib.sha256(uploaded_bytes).hexdigest()[:12]
+        st.caption(f"Loaded {uploaded_file.name}: {len(uploaded_text):,} characters")
+
+    doc_title = st.text_input(
+        "New document title",
+        value="Onboarding notes",
+        key=f"new_doc_title_{input_version}",
+    )
+    doc_text = st.text_area(
+        "Paste or edit document text",
+        value=uploaded_text or default_text,
+        height=180,
+        key=f"new_doc_text_{input_version}_{sample_choice}_{upload_token}",
+    )
+
+    if st.button("Add document to client", type="primary", key=f"add_doc_{input_version}"):
+        if not doc_text.strip():
+            st.warning("Add some document text first.")
+        else:
+            client["documents"].append({
+                "doc_id": f"doc_{uuid.uuid4().hex[:8]}",
+                "title": (doc_title or "Untitled document").strip(),
+                "text": doc_text.strip(),
+                "active": True,
+            })
+            st.session_state.document_input_version += 1
+            st.toast("Document added")
+            st.rerun()
+
+
 def render_documents(client: Dict[str, Any]) -> None:
-    st.subheader("Documents")
+    with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+        st.subheader("Documents", anchor=False, width="content")
+        if st.button(r"\+", key="open_add_document", help="Add document", type="primary"):
+            render_add_document_dialog(client)
+
     st.caption("Removing a document does not delete fields that were already extracted or advisor-reviewed.")
 
     docs = client["documents"]
     if not docs:
-        st.info("No documents added yet. Paste or upload onboarding information below.")
+        st.info("No documents added yet. Click + to add onboarding information.")
 
     remove_doc_id = None
     for doc in docs:
@@ -704,74 +772,12 @@ def render_documents(client: Dict[str, Any]) -> None:
         st.toast("Document removed. Existing KYC fields were retained.")
         st.rerun()
 
-    with st.expander("+ Add document", expanded=True):
-        input_version = st.session_state.document_input_version
-        sample_choice = st.selectbox(
-            "Use sample input",
-            [
-                "None",
-                "Contradictory sample - Priya",
-                "Incomplete sample - Kabir",
-                "Discovery call - Priya",
-                "Follow up - Priya",
-            ],
-            key=f"sample_choice_{input_version}",
-        )
-        default_text = ""
-        if sample_choice == "Contradictory sample - Priya":
-            default_text = NEW_CLIENT_SAMPLE
-        elif sample_choice == "Incomplete sample - Kabir":
-            default_text = INCOMPLETE_SAMPLE
-        elif sample_choice == "Discovery call - Priya":
-            default_text = PRIYA_DISCOVERY_CALL_SAMPLE
-        elif sample_choice == "Follow up - Priya":
-            default_text = PRIYA_FOLLOW_UP_SAMPLE
-
-        uploaded_file = st.file_uploader(
-            "Upload .txt file",
-            type=["txt"],
-            key=f"upload_file_{input_version}",
-        )
-        uploaded_text = ""
-        upload_token = "no_upload"
-        if uploaded_file is not None:
-            uploaded_bytes = uploaded_file.getvalue()
-            uploaded_text = decode_text_upload(uploaded_bytes)
-            upload_token = hashlib.sha256(uploaded_bytes).hexdigest()[:12]
-            st.caption(f"Loaded {uploaded_file.name}: {len(uploaded_text):,} characters")
-
-        doc_title = st.text_input(
-            "New document title",
-            value="Onboarding notes",
-            key=f"new_doc_title_{input_version}",
-        )
-        doc_text = st.text_area(
-            "Paste or edit document text",
-            value=uploaded_text or default_text,
-            height=180,
-            key=f"new_doc_text_{input_version}_{sample_choice}_{upload_token}",
-        )
-
-        if st.button("Add document to client", type="primary", key=f"add_doc_{input_version}"):
-            if not doc_text.strip():
-                st.warning("Add some document text first.")
-            else:
-                client["documents"].append({
-                    "doc_id": f"doc_{uuid.uuid4().hex[:8]}",
-                    "title": (doc_title or "Untitled document").strip(),
-                    "text": doc_text.strip(),
-                    "active": True,
-                })
-                st.session_state.document_input_version += 1
-                st.toast("Document added")
-                st.rerun()
-
 
 def render_agent_actions(client_id: str, client: Dict[str, Any]) -> None:
     active_docs = [d for d in client["documents"] if d.get("active", True)]
     combined_text = "\n\n".join([f"## {d['title']}\n{d['text']}" for d in active_docs])
 
-    st.subheader("Agent run")
+    st.subheader("Agent run", anchor=False)
     st.caption("The agent extracts KYC fields, validates completeness, and generates advisor follow-up questions.")
 
     col1, col2 = st.columns([1, 3])
@@ -884,6 +890,15 @@ def main() -> None:
             background-color: light-dark(#ffffff, #0e1117);
             box-shadow: 0 1px 0 color-mix(in srgb, CanvasText 18%, transparent),
                         0 4px 8px color-mix(in srgb, CanvasText 6%, transparent);
+        }
+
+        /* Match the document add control to the primary action while keeping it square. */
+        .st-key-open_add_document button {
+            width: 2rem;
+            min-width: 2rem;
+            height: 2rem;
+            min-height: 2rem;
+            padding: 0;
         }
 
         /* Keep risk confidence compact and inset into the risk tolerance field. */
