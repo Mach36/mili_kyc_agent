@@ -90,6 +90,20 @@ def _split_list(value: str) -> List[str]:
 # -----------------------------
 
 def _extract_name(text: str) -> Optional[str]:
+    transcript_name = _first_match(
+        text,
+        [
+            r"^\s*Call Transcript(?:\s+\d+)?\s*[-:]\s*"
+            r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}?)\s+"
+            r"(?:Initial|Follow-up|Follow up|Discovery|Clarification)\b",
+            r"\b(?:my\s+)?full name is\s+"
+            r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s*(?:[,.]|$)",
+        ],
+        flags=re.I | re.M,
+    )
+    if transcript_name:
+        return transcript_name
+
     # Paragraph-style notes: "Client: Anika Sharma, age 42. Works as..."
     inline = _first_match(
         text,

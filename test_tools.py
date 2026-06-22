@@ -1,9 +1,20 @@
 import unittest
 
+from sample_data import PRIYA_DISCOVERY_CALL_SAMPLE, PRIYA_FOLLOW_UP_SAMPLE
 from tools import local_extract_kyc_profile
 
 
 class IdentityExtractionTests(unittest.TestCase):
+    def test_extracts_name_from_discovery_call_self_introduction(self):
+        profile = local_extract_kyc_profile(PRIYA_DISCOVERY_CALL_SAMPLE)
+
+        self.assertEqual(profile["name"], "Priya Kapoor")
+
+    def test_extracts_name_from_follow_up_transcript_title(self):
+        profile = local_extract_kyc_profile(PRIYA_FOLLOW_UP_SAMPLE)
+
+        self.assertEqual(profile["name"], "Priya Kapoor")
+
     def test_extracts_gender_and_pronouns_from_labelled_fields(self):
         profile = local_extract_kyc_profile(
             "Client name: Alex Morgan\nGender: Non-binary\nPronouns: they/them"
