@@ -356,35 +356,73 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
         )
         profile["date_of_birth"] = selected_date_of_birth.isoformat() if selected_date_of_birth else None
         profile["age"] = calculate_age(profile["date_of_birth"]) if profile["date_of_birth"] else None
-        if profile["age"] is not None:
-            date_input_key = f"date_of_birth_{client_id}_{version}"
-            st.markdown(
-                f"""
-                <style>
-                .st-key-{date_input_key} [data-baseweb="input"] {{
-                    position: relative;
-                }}
-                .st-key-{date_input_key} [data-baseweb="input"] input {{
-                    padding-right: 6.5rem;
-                }}
-                .st-key-{date_input_key} [data-baseweb="input"]::after {{
-                    content: "Age: {profile['age']}";
-                    position: absolute;
-                    right: 5%;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    color: inherit;
-                    opacity: 0.6;
-                    font-family: inherit;
-                    font-size: 0.875rem;
-                    line-height: 1.25rem;
-                    white-space: nowrap;
-                    pointer-events: none;
-                }}
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
+        clear_date_of_birth = st.button(
+            "Clear",
+            key=f"clear_date_of_birth_{client_id}_{version}",
+            disabled=selected_date_of_birth is None,
+            help="Clear date of birth",
+        )
+        if clear_date_of_birth:
+            profile["date_of_birth"] = None
+            profile["age"] = None
+            st.session_state.profile_editor_version += 1
+            st.rerun()
+
+        date_input_key = f"date_of_birth_{client_id}_{version}"
+        age_label = f"Age: {profile['age']}" if profile["age"] is not None else ""
+        st.markdown(
+            f"""
+            <style>
+            [data-testid="stColumn"]:has(.st-key-clear_date_of_birth_{client_id}_{version}) {{
+                position: relative;
+            }}
+            .st-key-clear_date_of_birth_{client_id}_{version} {{
+                position: absolute;
+                right: 0;
+                top: 0;
+                z-index: 3;
+            }}
+            .st-key-clear_date_of_birth_{client_id}_{version} button {{
+                min-height: 1.25rem;
+                height: 1.25rem;
+                padding: 0 0.3rem;
+                border: 0;
+                background: transparent;
+                color: inherit;
+                opacity: 0.6;
+                font-size: 0.7rem;
+                line-height: 1rem;
+            }}
+            .st-key-clear_date_of_birth_{client_id}_{version} button:disabled {{
+                visibility: hidden;
+            }}
+            .st-key-{date_input_key} [data-baseweb="input"] {{
+                position: relative;
+            }}
+            .st-key-{date_input_key} [data-baseweb="input"] svg {{
+                display: none;
+            }}
+            .st-key-{date_input_key} [data-baseweb="input"] input {{
+                padding-right: 6.5rem;
+            }}
+            .st-key-{date_input_key} [data-baseweb="input"]::after {{
+                content: "{age_label}";
+                position: absolute;
+                right: 5%;
+                top: 50%;
+                transform: translateY(-50%);
+                color: inherit;
+                opacity: 0.6;
+                font-family: inherit;
+                font-size: 0.875rem;
+                line-height: 1.25rem;
+                white-space: nowrap;
+                pointer-events: none;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
     with c3:
         profile["occupation"] = st.text_input(
             "Occupation",
