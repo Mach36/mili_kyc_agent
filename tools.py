@@ -203,12 +203,100 @@ def profile_list_item_to_text(value: Any) -> str:
     return str(value)
 
 
-def normalise_profile_list(value: Any) -> List[str]:
+def dependent_item_to_text(value: Any) -> str:
+    """Convert a structured dependent into a simple relationship and age."""
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            try:
+                parsed = json.loads(stripped)
+            except (TypeError, ValueError):
+                return value
+            if isinstance(parsed, dict):
+                value = parsed
+        else:
+            return value
+
+    if not isinstance(value, dict):
+        return profile_list_item_to_text(value)
+
+    relationship = str(value.get("relationship", "") or "").strip().title()
+    name = str(value.get("name", "") or "").strip()
+    age = value.get("age")
+    parts = [relationship or name or "Dependent"]
+    if age not in [None, ""]:
+        parts.append(f"aged {age}")
+    return " ".join(parts)
+
+
+def normalise_profile_list(value: Any, field_name: Optional[str] = None) -> List[str]:
     """Coerce a profile list field to the List[str] shape used by the UI."""
     if value in [None, "", [], {}]:
         return []
     items = value if isinstance(value, list) else [value]
-    return [profile_list_item_to_text(item) for item in items]
+    formatter = dependent_item_to_text if field_name == "dependents" else profile_list_item_to_text
+    return [formatter(item) for item in items]
+
+
+_GENERIC_HORIZON_LABELS = {
+    "short_term": "Short term - exact time horizon not confirmed",
+    "medium_term": "Medium term - exact time horizon not confirmed",
+    "long_term": "Long term - exact time horizon not confirmed",
+}
+
+
+def _time_horizon_goal_key(value: Any) -> Optional[str]:
+    """Return a stable goal key when a model describes the goal in free text."""
+    text = str(value or "").casefold().replace("’", "'")
+    if "home renovation" in text or ("renovation" in text and "home" in text):
+        return "home_renovation"
+    if "retirement" in text:
+        return "retirement"
+    if re.search(r"\b(?:son|child).{0,20}\b(?:education|university|college)\b", text):
+        return "child_education"
+    if re.search(r"\b(?:education|university|college)\b", text):
+        return "education"
+    if "emergency" in text:
+        return "emergency_reserve"
+    return None
+
+
+def _time_horizon_text(value: Any, fallback: str) -> str:
+    """Extract a horizon phrase without retaining a goal description in it."""
+    text = str(value or "").strip()
+    duration = re.search(
+        r"\b(?:next year|near term|\d+\s*(?:[–-]\s*\d+\s*)?(?:months?|years?))\b",
+        text,
+        re.I,
+    )
+    return duration.group(0).replace("–", "-") if duration else fallback
+
+
+def normalise_time_horizon(value: Any) -> Dict[str, str]:
+    """Repair model-produced horizons into goal/need -> plain-text horizon rows."""
+    if not isinstance(value, dict):
+        return {}
+
+    normalised: Dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        key = re.sub(r"[^a-z0-9]+", "_", str(raw_key).casefold()).strip("_")
+        generic_fallback = _GENERIC_HORIZON_LABELS.get(key)
+
+        if generic_fallback:
+            items = raw_value if isinstance(raw_value, list) else [raw_value]
+            for item in items:
+                goal_key = _time_horizon_goal_key(item)
+                if goal_key:
+                    normalised[goal_key] = _time_horizon_text(item, generic_fallback)
+            continue
+
+        if isinstance(raw_value, (dict, list)):
+            continue
+        horizon = str(raw_value or "").strip()
+        if key and horizon:
+            normalised[key] = horizon
+
+    return normalised
 
 
 def _list_item_key(value: Any) -> str:
@@ -286,9 +374,12 @@ def merge_kyc_profiles(
     """Merge extracted KYC data without erasing previously reviewed values."""
     merged = copy.deepcopy(existing_profile or {})
 
+    if "time_horizon" in merged:
+        merged["time_horizon"] = normalise_time_horizon(merged["time_horizon"])
+
     for field_name in PROFILE_LIST_FIELDS:
         if field_name in merged:
-            merged[field_name] = normalise_profile_list(merged[field_name])
+            merged[field_name] = normalise_profile_list(merged[field_name], field_name)
 
     for key, value in new_profile.items():
         if key == "client_id" and merged.get("client_id"):
@@ -297,7 +388,7 @@ def merge_kyc_profiles(
             continue
 
         if key in PROFILE_LIST_FIELDS:
-            value = normalise_profile_list(value)
+            value = normalise_profile_list(value, key)
             if key in _LATEST_RUN_LIST_FIELDS:
                 merged[key] = copy.deepcopy(value)
                 continue
@@ -305,6 +396,16 @@ def merge_kyc_profiles(
             if not isinstance(current, list):
                 current = []
             merged[key] = merge_list_values(key, current, value)
+            continue
+
+        if key == "time_horizon":
+            value = normalise_time_horizon(value)
+            if not value:
+                continue
+            current = merged.get(key, {})
+            if not isinstance(current, dict):
+                current = {}
+            merged[key] = {**current, **value}
             continue
 
         if isinstance(value, dict):
@@ -462,16 +563,49 @@ def _extract_dependents(text: str) -> List[str]:
 
     son_match = re.search(r"\b(?:one\s+)?son(?:\s+aged\s+\d{1,2})?\b", text, re.I)
     if son_match:
-        dependents.append(son_match.group(0).capitalize())
+        son_age = _extract_dependent_age(text, "son", "he")
+        dependents.append(f"Son aged {son_age}" if son_age else "Son")
 
     daughter_match = re.search(r"\b(?:one\s+)?daughter(?:\s+aged\s+\d{1,2})?\b", text, re.I)
     if daughter_match:
-        dependents.append(daughter_match.group(0).capitalize())
+        daughter_age = _extract_dependent_age(text, "daughter", "she")
+        dependents.append(
+            f"Daughter aged {daughter_age}" if daughter_age else "Daughter"
+        )
 
     if re.search(r"\bparents?\b", text, re.I):
         dependents.append("Parent(s)")
 
     return _dedupe(dependents)
+
+
+def _extract_dependent_age(text: str, relationship: str, pronoun: str) -> Optional[int]:
+    """Find an inline age or an age stated in the immediately following sentence."""
+    patterns = [
+        rf"\b{relationship}\s+(?:is\s+)?(?:aged|age)\s*(\d{{1,2}})\b",
+        rf"\b{relationship}\s+is\s+(\d{{1,2}})\s+years?\s+old\b",
+        (
+            rf"\b{relationship}\b[^.\n]{{0,120}}[.]\s*"
+            rf"(?:[A-Za-z]+:\s*)?{pronoun}\s+is\s+(\d{{1,2}})\s+years?\s+old\b"
+        ),
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            age = int(match.group(1))
+            return age if age <= 30 else None
+    return None
+
+
+def _mentions_home_renovation(text: str) -> bool:
+    """Recognise both 'home renovation' and conversational 'renovate my home'."""
+    return bool(
+        re.search(
+            r"\b(?:home\s+renovat\w*|renovat\w*(?:\s+\w+){0,3}\s+home)\b",
+            text,
+            re.I,
+        )
+    )
 
 
 def _extract_goals(text: str) -> List[str]:
@@ -489,7 +623,7 @@ def _extract_goals(text: str) -> List[str]:
             goals.append("Education funding")
     if "long-term wealth" in lower or "wealth planning" in lower or "wealth creation" in lower:
         goals.append("Long-term wealth planning")
-    if re.search(r"\bhome renovation\b", lower):
+    if _mentions_home_renovation(text):
         goals.append("Maintain liquidity for possible home renovation")
     if "second property" in lower:
         goals.append("Buy a second property")
@@ -512,7 +646,7 @@ def _extract_liquidity_needs(text: str) -> List[str]:
     )
     if renovation_amt:
         needs.append(f"May need INR {renovation_amt.group(1).replace(' ', '')} for home renovation in the next 12-18 months")
-    elif re.search(r"home renovation", text, re.I):
+    elif _mentions_home_renovation(text):
         needs.append("May need liquidity for possible home renovation next year")
 
     if re.search(r"short-term losses.*?(renovation|emergency)", text, re.I | re.S):
@@ -570,8 +704,8 @@ def _extract_time_horizon(text: str) -> Dict[str, str]:
         else:
             horizons["education"] = "Future education funding - exact year not confirmed"
 
-    if re.search(r"home renovation", text, re.I):
-        if re.search(r"12\s*[–\-]\s*18\s+months", text, re.I):
+    if _mentions_home_renovation(text):
+        if re.search(r"12\s*(?:to|[–\-])\s*18\s+months", text, re.I):
             horizons["home_renovation"] = "12-18 months"
         elif re.search(r"next year", text, re.I):
             horizons["home_renovation"] = "Next year"

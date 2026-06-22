@@ -41,6 +41,14 @@ Final output must be valid JSON only.
 Do not wrap the JSON in markdown.
 Do not add commentary before or after the JSON.
 Every item in a JSON array must be a plain string, not an object or nested array.
+Preserve the structured values returned by the tools. Do not reorganize them
+into a new summary shape.
+
+For time_horizon specifically:
+- It must map a specific goal or need key to one plain string horizon.
+- Use keys such as retirement, child_education, and home_renovation.
+- Never use generic keys such as short_term, medium_term, or long_term.
+- Never put an array or object inside time_horizon.
 
 The final JSON should follow this shape:
 

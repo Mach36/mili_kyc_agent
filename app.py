@@ -4,7 +4,7 @@ import hashlib
 import json
 import uuid
 from datetime import date
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -23,9 +23,13 @@ from tools import (
     calculate_profile_completion,
     merge_kyc_profiles,
     normalise_profile_list,
+    normalise_time_horizon,
 )
 
 APP_TITLE = "Mili KYC Agent"
+PROFILE_TAB = "Client profile"
+DOCUMENTS_TAB = "Documents & agent"
+JSON_TAB = "Underlying JSON"
 
 st.set_page_config(page_title=APP_TITLE, page_icon="🧾", layout="wide")
 
@@ -197,6 +201,19 @@ def apply_global_styles() -> None:
             color: #ffffff !important;
             transform: none;
             box-shadow: none !important;
+        }}
+        .st-key-remove_selected_client button {{
+            min-height: 2rem !important;
+            justify-content: center !important;
+            color: #b42318 !important;
+            font-size: 0.78rem;
+        }}
+        .st-key-remove_selected_client button:hover {{
+            border-color: color-mix(in srgb, #b42318 35%, transparent) !important;
+            background: color-mix(in srgb, #b42318 8%, transparent) !important;
+            color: #b42318 !important;
+            box-shadow: none !important;
+            transform: none;
         }}
 
         .stTextInput input,
@@ -406,19 +423,27 @@ def init_state() -> None:
         st.session_state.clients = seed_clients()
     for client in st.session_state.clients.values():
         client.setdefault("kyc_reviewed", False)
-    if "selected_client_id" not in st.session_state:
-        st.session_state.selected_client_id = next(iter(st.session_state.clients.keys()))
+    selected_client_id = st.session_state.get("selected_client_id")
+    if selected_client_id not in st.session_state.clients:
+        st.session_state.selected_client_id = next(
+            iter(st.session_state.clients), None
+        )
     if "last_agent_run" not in st.session_state:
         st.session_state.last_agent_run = None
     # These counters are used to reset Streamlit input widgets after submit.
     if "new_client_input_version" not in st.session_state:
         st.session_state.new_client_input_version = 0
+    last_unnamed_client_id = st.session_state.get("last_unnamed_client_id")
+    if last_unnamed_client_id not in st.session_state.clients:
+        st.session_state.last_unnamed_client_id = None
     if "document_input_version" not in st.session_state:
         st.session_state.document_input_version = 0
     if "document_upload_version" not in st.session_state:
         st.session_state.document_upload_version = 0
     if "profile_editor_version" not in st.session_state:
         st.session_state.profile_editor_version = 0
+    if st.session_state.get("pending_client_removal") not in st.session_state.clients:
+        st.session_state.pending_client_removal = None
 
 
 def new_empty_profile(client_id: str, name: str) -> Dict[str, Any]:
@@ -447,13 +472,76 @@ def new_empty_profile(client_id: str, name: str) -> Dict[str, Any]:
     }
 
 
+def is_untouched_unnamed_client(client_id: str) -> bool:
+    """Return whether a generated unnamed client still has no advisor input."""
+    client = st.session_state.clients.get(client_id)
+    if not client or client.get("documents") or client.get("kyc_reviewed"):
+        return False
+
+    profile = client.get("profile", {})
+    baseline = new_empty_profile(client_id, "")
+    profile_without_score = {
+        key: value for key, value in profile.items() if key != "completion_score"
+    }
+    baseline_without_score = {
+        key: value for key, value in baseline.items() if key != "completion_score"
+    }
+    return profile_without_score == baseline_without_score
+
+
+def remove_client(client_id: str) -> None:
+    """Remove a client and keep the active selection valid."""
+    client_ids = list(st.session_state.clients)
+    if client_id not in st.session_state.clients:
+        return
+
+    removed_index = client_ids.index(client_id)
+    del st.session_state.clients[client_id]
+    remaining_ids = list(st.session_state.clients)
+    st.session_state.selected_client_id = (
+        remaining_ids[min(removed_index, len(remaining_ids) - 1)]
+        if remaining_ids
+        else None
+    )
+    st.session_state.last_agent_run = None
+    st.session_state.profile_editor_version += 1
+    st.session_state.pending_client_removal = None
+
+
+@st.dialog("Remove client?")
+def render_remove_client_dialog(client_id: str, client_name: str) -> None:
+    st.write(
+        f"Remove **{client_name}** and all of their documents and profile data? "
+        "This cannot be undone."
+    )
+    confirm_col, cancel_col = st.columns(2)
+    with confirm_col:
+        if st.button(
+            "Remove client",
+            key=f"confirm_remove_client_{client_id}",
+            type="primary",
+            use_container_width=True,
+        ):
+            remove_client(client_id)
+            st.toast(f"{client_name} removed")
+            st.rerun()
+    with cancel_col:
+        if st.button(
+            "Cancel",
+            key=f"cancel_remove_client_{client_id}",
+            use_container_width=True,
+        ):
+            st.session_state.pending_client_removal = None
+            st.rerun()
+
+
 def merge_profile(existing: Dict[str, Any], extracted: Dict[str, Any]) -> Dict[str, Any]:
     """Merge agent output without deleting advisor-confirmed fields when new data is incomplete."""
     return merge_kyc_profiles(existing, extracted)
 
 
-def list_to_text(items: Any) -> str:
-    return "\n".join(normalise_profile_list(items))
+def list_to_text(items: Any, field_name: Optional[str] = None) -> str:
+    return "\n".join(normalise_profile_list(items, field_name))
 
 
 def text_to_list(value: str) -> List[str]:
@@ -546,6 +634,55 @@ def disable_risk_confidence_typing() -> None:
     )
 
 
+def select_main_tab_in_browser(tab_label: str) -> None:
+    """Select a main tab after Streamlit reconciles the rerun in the browser."""
+    encoded_label = json.dumps(tab_label)
+    components.html(
+        f"""
+        <script>
+        const hostDocument = window.parent.document;
+        const targetLabel = {encoded_label};
+        let attempts = 0;
+
+        function selectTargetTab() {{
+            attempts += 1;
+            const tabs = hostDocument.querySelectorAll(
+                '[data-testid="stTabs"] [data-baseweb="tab"]'
+            );
+            const target = Array.from(tabs).find(
+                (tab) => tab.textContent.trim() === targetLabel
+            );
+
+            if (!target) {{
+                if (attempts < 40) window.setTimeout(selectTargetTab, 50);
+                return;
+            }}
+
+            if (target.getAttribute('aria-selected') !== 'true') {{
+                target.click();
+            }}
+
+            function scrollPageToTop() {{
+                const main = hostDocument.querySelector('[data-testid="stMain"]');
+                main?.scrollTo({{ top: 0, behavior: 'auto' }});
+                hostDocument.scrollingElement?.scrollTo({{ top: 0, behavior: 'auto' }});
+                window.parent.scrollTo({{ top: 0, behavior: 'auto' }});
+            }}
+
+            window.requestAnimationFrame(() => {{
+                window.requestAnimationFrame(scrollPageToTop);
+            }});
+            window.setTimeout(scrollPageToTop, 100);
+        }}
+
+        window.requestAnimationFrame(selectTargetTab);
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
+
+
 def render_time_horizon_editor(profile: Dict[str, Any], client_id: str, version: int) -> None:
     """
     Render time_horizon as clean editable rows instead of raw JSON.
@@ -556,9 +693,8 @@ def render_time_horizon_editor(profile: Dict[str, Any], client_id: str, version:
     st.markdown("**Goal timelines**")
     # st.caption("Each row links a goal or liquidity need to the relevant time horizon.")
 
-    raw_time_horizon = profile.get("time_horizon", {}) or {}
-    if not isinstance(raw_time_horizon, dict):
-        raw_time_horizon = {}
+    raw_time_horizon = normalise_time_horizon(profile.get("time_horizon", {}))
+    profile["time_horizon"] = raw_time_horizon
 
     updated_time_horizon: Dict[str, str] = {}
     remove_key = None
@@ -663,10 +799,8 @@ def render_sidebar() -> None:
         if reviewed_selectors
         else ""
     )
-    st.sidebar.html(
+    selected_rule = (
         f"""
-        <style>
-        {reviewed_rule}
         .st-key-select_{selected_client_id} button {{
             border-color: rgba(36, 107, 131, 0.3) !important;
             background: var(--mili-selected) !important;
@@ -677,6 +811,15 @@ def render_sidebar() -> None:
             color: var(--mili-navy) !important;
             font-weight: 750 !important;
         }}
+        """
+        if selected_client_id
+        else ""
+    )
+    st.sidebar.html(
+        f"""
+        <style>
+        {reviewed_rule}
+        {selected_rule}
         </style>
         """,
     )
@@ -687,7 +830,27 @@ def render_sidebar() -> None:
         if st.sidebar.button(label, key=f"select_{client_id}", use_container_width=True):
             if st.session_state.selected_client_id != client_id:
                 st.session_state.selected_client_id = client_id
+                st.session_state.last_unnamed_client_id = None
                 st.rerun()
+
+    if selected_client_id:
+        selected_profile = st.session_state.clients[selected_client_id]["profile"]
+        selected_name = selected_profile.get("name") or "Unnamed client"
+        if st.sidebar.button(
+            "Remove selected client",
+            key="remove_selected_client",
+            use_container_width=True,
+        ):
+            st.session_state.pending_client_removal = selected_client_id
+            st.rerun()
+    else:
+        st.sidebar.caption("No clients yet.")
+
+    pending_client_id = st.session_state.pending_client_removal
+    if pending_client_id:
+        pending_profile = st.session_state.clients[pending_client_id]["profile"]
+        pending_name = pending_profile.get("name") or "Unnamed client"
+        render_remove_client_dialog(pending_client_id, pending_name)
 
     st.sidebar.divider()
     with st.sidebar.container(key="new_client_panel"):
@@ -708,6 +871,17 @@ def render_sidebar() -> None:
             use_container_width=True,
         ):
             clean_name = (new_name or "").strip()
+            is_repeated_unnamed_creation = (
+                not clean_name
+                and st.session_state.last_unnamed_client_id
+                == st.session_state.selected_client_id
+                and is_untouched_unnamed_client(
+                    st.session_state.selected_client_id
+                )
+            )
+            if is_repeated_unnamed_creation:
+                return
+
             client_id = f"client_{uuid.uuid4().hex[:8]}"
             st.session_state.clients[client_id] = {
                 "client_id": client_id,
@@ -716,6 +890,9 @@ def render_sidebar() -> None:
                 "kyc_reviewed": False,
             }
             st.session_state.selected_client_id = client_id
+            st.session_state.last_unnamed_client_id = (
+                client_id if not clean_name else None
+            )
             st.session_state.new_client_input_version += 1
             st.toast("New client created")
             st.rerun()
@@ -987,7 +1164,7 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             ))
             profile["dependents"] = text_to_list(st.text_area(
                 "Dependents",
-                value=list_to_text(profile.get("dependents", [])),
+                value=list_to_text(profile.get("dependents", []), "dependents"),
                 height=PROFILE_TEXT_AREA_HEIGHT,
                 key=f"dependents_{client_id}_{version}",
             ))
@@ -1274,6 +1451,7 @@ def render_agent_actions(client_id: str, client: Dict[str, Any]) -> None:
                 st.session_state.clients[client_id] = client
                 st.session_state.last_agent_run = last_run
                 st.session_state.profile_editor_version += 1
+                st.session_state.next_main_tab = PROFILE_TAB
 
                 st.success("KYC profile updated")
                 st.rerun()
@@ -1301,6 +1479,7 @@ def render_agent_actions(client_id: str, client: Dict[str, Any]) -> None:
                 st.session_state.clients[client_id] = client
                 st.session_state.last_agent_run = last_run
                 st.session_state.profile_editor_version += 1
+                st.session_state.next_main_tab = PROFILE_TAB
 
                 st.success("KYC profile updated")
                 st.rerun()
@@ -1321,6 +1500,12 @@ def main() -> None:
     render_sidebar()
 
     client_id = st.session_state.selected_client_id
+    if client_id is None:
+        st.markdown('<p class="mili-eyebrow">Advisor operations</p>', unsafe_allow_html=True)
+        st.title("Client Onboarding & KYC Agent")
+        st.info("No clients in the workspace. Add a new client from the sidebar to begin.")
+        return
+
     client = st.session_state.clients[client_id]
     profile = client["profile"]
 
@@ -1476,7 +1661,13 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     disable_risk_confidence_typing()
-    tab1, tab2, tab3 = st.tabs(["Client profile", "Documents & agent", "Underlying JSON"])
+    default_tab = st.session_state.pop("next_main_tab", None)
+    tab1, tab2, tab3 = st.tabs(
+        [PROFILE_TAB, DOCUMENTS_TAB, JSON_TAB],
+        default=default_tab,
+    )
+    if default_tab:
+        select_main_tab_in_browser(default_tab)
 
     with tab1:
         render_profile_editor(client_id, client)

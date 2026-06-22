@@ -6,6 +6,7 @@ from tools import (
     local_extract_kyc_profile,
     merge_kyc_profiles,
     normalise_profile_list,
+    normalise_time_horizon,
 )
 
 
@@ -36,31 +37,94 @@ class ProfileCompletionTests(unittest.TestCase):
 
 
 class ProfileListNormalisationTests(unittest.TestCase):
-    def test_structured_items_become_editable_json_text(self):
+    def test_structured_dependents_become_readable_english(self):
         self.assertEqual(
             normalise_profile_list(
-                [{"relationship": "Son", "age": 12}, "Spouse"]
+                [
+                    {
+                        "relationship": "son",
+                        "age": 8,
+                        "financially_dependent": True,
+                    },
+                    "Spouse",
+                ],
+                "dependents",
             ),
-            ['{"age": 12, "relationship": "Son"}', "Spouse"],
+            ["Son aged 8", "Spouse"],
         )
 
-    def test_merge_repairs_structured_items_already_in_profile(self):
+    def test_merge_repairs_structured_dependents_already_in_profile(self):
         merged = merge_kyc_profiles(
             {"client_id": "client_test", "dependents": [{"name": "Asha"}]},
             {"occupation": "Consultant"},
         )
 
-        self.assertEqual(merged["dependents"], ['{"name": "Asha"}'])
+        self.assertEqual(merged["dependents"], ["Asha"])
 
-    def test_merge_normalises_structured_agent_list_items(self):
+    def test_merge_normalises_structured_agent_dependents(self):
         merged = merge_kyc_profiles(
             {"client_id": "client_test", "dependents": []},
             {"dependents": [{"relationship": "Daughter", "age": 8}]},
         )
 
+        self.assertEqual(merged["dependents"], ["Daughter aged 8"])
+
+    def test_repairs_previously_serialised_dependent_json(self):
         self.assertEqual(
-            merged["dependents"],
-            ['{"age": 8, "relationship": "Daughter"}'],
+            normalise_profile_list(
+                ['{"age": 8, "financially_dependent": true, "relationship": "son"}'],
+                "dependents",
+            ),
+            ["Son aged 8"],
+        )
+
+
+class TimeHorizonNormalisationTests(unittest.TestCase):
+    def test_repairs_generic_agent_buckets_from_priya_discovery_call(self):
+        malformed = {
+            "Short Term": "12-18 months for home renovation",
+            "Long Term": ["Retirement", "Son's education"],
+        }
+
+        self.assertEqual(
+            normalise_time_horizon(malformed),
+            {
+                "home_renovation": "12-18 months",
+                "retirement": "Long term - exact time horizon not confirmed",
+                "child_education": "Long term - exact time horizon not confirmed",
+            },
+        )
+
+    def test_merge_repairs_malformed_agent_horizon_before_ui_state(self):
+        merged = merge_kyc_profiles(
+            {"client_id": "priya"},
+            {
+                "time_horizon": {
+                    "Short Term": "12-18 months for home renovation",
+                    "Long Term": ["Retirement", "Son's education"],
+                }
+            },
+        )
+
+        self.assertEqual(
+            merged["time_horizon"],
+            {
+                "home_renovation": "12-18 months",
+                "retirement": "Long term - exact time horizon not confirmed",
+                "child_education": "Long term - exact time horizon not confirmed",
+            },
+        )
+
+    def test_discovery_call_extractor_uses_specific_goal_keys(self):
+        profile = local_extract_kyc_profile(PRIYA_DISCOVERY_CALL_SAMPLE)
+
+        self.assertEqual(
+            profile["time_horizon"],
+            {
+                "retirement": "Long term - exact retirement date not confirmed",
+                "child_education": "Son's future education - exact year not confirmed",
+                "home_renovation": "12-18 months",
+            },
         )
 
 
@@ -157,6 +221,27 @@ class MaritalStatusExtractionTests(unittest.TestCase):
             with self.subTest(source=source):
                 profile = local_extract_kyc_profile(f"Marital status: {source}")
                 self.assertEqual(profile["marital_status"], expected)
+
+
+class DependentsExtractionTests(unittest.TestCase):
+    def test_associates_following_pronoun_age_with_son(self):
+        profile = local_extract_kyc_profile(
+            "My son is financially dependent on me. He is 8 years old."
+        )
+
+        self.assertEqual(profile["dependents"], ["Son aged 8"])
+
+    def test_priya_discovery_call_keeps_sons_age(self):
+        profile = local_extract_kyc_profile(PRIYA_DISCOVERY_CALL_SAMPLE)
+
+        self.assertEqual(profile["dependents"], ["Son aged 8"])
+
+    def test_does_not_use_client_age_for_dependent(self):
+        profile = local_extract_kyc_profile(
+            "I am 39 years old. My son is financially dependent on me."
+        )
+
+        self.assertEqual(profile["dependents"], ["Son"])
 
 
 if __name__ == "__main__":
