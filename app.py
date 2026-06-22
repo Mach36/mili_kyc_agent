@@ -116,6 +116,11 @@ def apply_global_styles() -> None:
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
             padding-top: 1rem;
         }}
+        [data-testid="stSidebarCollapseButton"],
+        [data-testid="stSidebarCollapseButton"] button {{
+            visibility: visible !important;
+            opacity: 1 !important;
+        }}
         [data-testid="stSidebar"] h1 {{
             color: var(--mili-navy);
             font-size: 1.35rem;
