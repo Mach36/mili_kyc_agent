@@ -919,6 +919,22 @@ def main() -> None:
         [class*="st-key-identity_details_"] .stTextInput {
             margin: 0;
         }
+        @media (max-width: 640px) {
+            [class*="st-key-identity_details_"] {
+                width: 100%;
+                margin-top: 0;
+                margin-bottom: 0;
+            }
+            [class*="st-key-identity_details_"] [data-testid="stHorizontalBlock"] {
+                flex-wrap: nowrap;
+                width: 100%;
+            }
+            [class*="st-key-identity_details_"] [data-testid="stColumn"] {
+                width: calc((100% - 0.35rem) / 2);
+                min-width: 0;
+                flex: 1 1 0;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
