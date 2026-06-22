@@ -245,6 +245,30 @@ def apply_global_styles() -> None:
         [data-testid="stExpander"] summary {{
             font-weight: 700;
         }}
+        [class*="st-key-document_card_"] [class*="st-key-title_doc_"] [data-baseweb="input"] {{
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+        }}
+        [class*="st-key-document_card_"] [class*="st-key-title_doc_"] [data-baseweb="input"]:hover,
+        [class*="st-key-document_card_"] [class*="st-key-title_doc_"] [data-baseweb="input"]:focus-within {{
+            border-color: var(--mili-border);
+            background: var(--mili-surface);
+        }}
+        [class*="st-key-document_card_"] [class*="st-key-title_doc_"] input {{
+            padding-left: 0.65rem;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }}
+        [class*="st-key-toggle_contents_"] button {{
+            padding: 0.2rem 0;
+            color: var(--mili-muted);
+            font-weight: 650;
+        }}
+        [class*="st-key-toggle_contents_"] button:hover {{
+            box-shadow: none;
+            transform: none;
+        }}
         [data-testid="stAlert"] {{
             border-radius: var(--mili-radius);
         }}
@@ -256,12 +280,15 @@ def apply_global_styles() -> None:
             background: linear-gradient(90deg, var(--mili-blue), var(--mili-teal));
         }}
 
+        [data-testid="stTabs"] {{
+            margin-top: -2rem;
+        }}
         [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {{
             position: sticky;
             top: 3.75rem;
             z-index: 1000;
             isolation: isolate;
-            margin: 0.3rem 0 1.25rem;
+            margin: 0 0 1.25rem;
             padding: 0.35rem;
             border: 1px solid var(--mili-border);
             border-radius: var(--mili-radius);
@@ -299,7 +326,7 @@ def apply_global_styles() -> None:
             }}
             [data-testid="stTabs"] div:has(> [data-baseweb="tab-list"]) {{
                 top: 3.25rem;
-                margin-top: 0.25rem;
+                margin-top: 0;
             }}
             [data-baseweb="tab"] {{
                 padding: 0 0.75rem;
@@ -1085,15 +1112,44 @@ def render_documents(client: Dict[str, Any]) -> None:
 
     remove_doc_id = None
     for doc in docs:
-        with st.expander(f"{doc['title']} {'(inactive)' if not doc.get('active', True) else ''}", expanded=False):
-            doc["title"] = st.text_input("Document title", value=doc["title"], key=f"title_{doc['doc_id']}")
-            doc["text"] = st.text_area("Document text", value=doc["text"], height=180, key=f"text_{doc['doc_id']}")
-            cols = st.columns([1, 1, 4])
-            with cols[0]:
-                doc["active"] = st.checkbox("Active", value=doc.get("active", True), key=f"active_{doc['doc_id']}")
-            with cols[1]:
+        expanded_key = f"document_expanded_{doc['doc_id']}"
+        if expanded_key not in st.session_state:
+            st.session_state[expanded_key] = False
+
+        with st.container(border=True, key=f"document_card_{doc['doc_id']}"):
+            with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+                doc["title"] = st.text_input(
+                    "Document title",
+                    value=doc["title"],
+                    key=f"title_{doc['doc_id']}",
+                    label_visibility="collapsed",
+                )
+                doc["active"] = st.checkbox(
+                    "Active",
+                    value=doc.get("active", True),
+                    key=f"active_{doc['doc_id']}",
+                )
                 if st.button("Remove", key=f"remove_{doc['doc_id']}"):
                     remove_doc_id = doc["doc_id"]
+
+            is_expanded = st.session_state[expanded_key]
+            if st.button(
+                "Document contents",
+                key=f"toggle_contents_{doc['doc_id']}",
+                icon=":material/keyboard_arrow_up:" if is_expanded else ":material/keyboard_arrow_down:",
+                type="tertiary",
+            ):
+                is_expanded = not is_expanded
+                st.session_state[expanded_key] = is_expanded
+
+            if is_expanded:
+                doc["text"] = st.text_area(
+                    "Document text",
+                    value=doc["text"],
+                    height=180,
+                    key=f"text_{doc['doc_id']}",
+                    label_visibility="collapsed",
+                )
 
     if remove_doc_id:
         client["documents"] = [d for d in docs if d["doc_id"] != remove_doc_id]
