@@ -137,3 +137,91 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
 NEW_CLIENT_SAMPLE = """Client: Priya Kapoor. Date of birth: 12 May 1987. Works as a senior consultant. She wants to invest for retirement and for her son's education. She says she is low risk and wants capital protection, but later says she wants aggressive growth and high returns within 2 years. She may need cash for a home renovation next year. Her husband and son are dependents. Existing assets include fixed deposits and some equity mutual funds. No income, liabilities, or exact investment amount provided."""
 
 INCOMPLETE_SAMPLE = """Client: Kabir Arora. Met during discovery call. He wants help with long-term wealth creation and may invest later this year. He mentioned that his parents may depend on him financially. No date of birth, income, existing assets, liabilities, risk tolerance, or time horizon were confirmed."""
+
+PRIYA_DISCOVERY_CALL_SAMPLE = """Call Transcript 1 - Priya Kapoor Initial Discovery Call
+
+Advisor: Good morning, Priya. Thanks for joining. To begin with, could you confirm a few basic details for your client profile?
+
+Priya: Sure. My full name is Priya Kapoor. I am 39 years old and I work as a Senior Strategy Consultant.
+
+Advisor: Thank you. Could you confirm your marital status and dependents?
+
+Priya: I am divorced. My son is financially dependent on me. He is 8 years old.
+
+Advisor: Understood. What are the main reasons you are seeking financial advice at this stage?
+
+Priya: I want to start planning more seriously for the long term. Retirement is one goal, but I also want to plan for my son's education. He is still young, but I know education costs can become significant later.
+
+Advisor: Are there any shorter-term financial needs we should keep in mind?
+
+Priya: Yes. I may renovate my home next year. I may need around INR 12 to 15 lakh for that in the next 12 to 18 months. I do not want that money exposed to too much market risk.
+
+Advisor: What is your approximate household income?
+
+Priya: Around INR 65 lakh per year.
+
+Advisor: Could you briefly describe your existing investments or assets?
+
+Priya: I have fixed deposits, EPF, some equity mutual funds, and company stock from my employer.
+
+Advisor: Do you currently have any loans or liabilities?
+
+Priya: I have an ongoing home loan EMI. Other than that, I do not think there is anything major, but I would need to check.
+
+Advisor: How would you describe your risk appetite?
+
+Priya: Generally, I am cautious. I do not like taking very large risks, especially with money that I may need soon.
+
+Advisor: For longer-term goals like retirement or education, would you be comfortable with some market volatility?
+
+Priya: Yes, for long-term goals I am comfortable with moderate risk. But I would not want short-term losses to affect the money needed for renovation or emergency savings.
+
+Advisor: Thank you. I will capture that. We may need to separate your short-term liquidity needs from your longer-term investment goals.
+
+Priya: Yes, that makes sense. I prefer something simple and easy to understand."""
+
+PRIYA_FOLLOW_UP_SAMPLE = """Call Transcript 2 - Priya Kapoor Follow-up Clarification Call
+
+Advisor: Hi Priya, thanks for joining again. I wanted to clarify a few points from our previous discussion.
+
+Priya: Sure.
+
+Advisor: Last time, you mentioned being cautious with money. But you also mentioned wanting strong growth. Could you explain that a little more?
+
+Priya: Yes. I would like part of my money to grow faster. Ideally, if a portion could double in 2 to 3 years, that would be great. But I do not want to gamble or lose a lot of money.
+
+Advisor: That is useful to clarify. So we should treat the renovation fund and emergency savings separately from any long-term growth allocation.
+
+Priya: Yes, exactly. I do not want money needed soon to be exposed to short-term market losses.
+
+Advisor: How much emergency cash would you like to keep available?
+
+Priya: I would like to keep at least 9 months of expenses as emergency savings.
+
+Advisor: What are your monthly household expenses approximately?
+
+Priya: I am not sure of the exact number. I can check and share it later.
+
+Advisor: How much capital are you planning to invest initially?
+
+Priya: I have not decided the exact amount yet. I need to review my current portfolio and cash position.
+
+Advisor: Do you know the current value of your overall investment portfolio?
+
+Priya: Not exactly. I can pull together the details of my mutual funds, fixed deposits, EPF, and company stock.
+
+Advisor: Do you have life insurance or health insurance coverage?
+
+Priya: I have some employer-provided health insurance, but I am not sure whether it is enough. I have not reviewed life insurance recently.
+
+Advisor: Since you are divorced and your son is dependent on you, we should also review protection planning and nominee details later.
+
+Priya: Yes, that would be helpful.
+
+Advisor: To summarise, your key goals are retirement planning, your son's education, and maintaining liquidity for possible home renovation. Your risk profile needs clarification because you described yourself as cautious but also mentioned high growth expectations over a short period.
+
+Priya: Yes, that summary is accurate.
+
+Advisor: For the next step, please share your current portfolio value, monthly expenses, investable amount, insurance details, nominee information, and any other liabilities apart from the home loan.
+
+Priya: Sure, I will send those after checking."""

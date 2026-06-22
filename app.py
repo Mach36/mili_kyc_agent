@@ -9,7 +9,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from agent import run_kyc_agent
-from sample_data import INCOMPLETE_SAMPLE, NEW_CLIENT_SAMPLE, seed_clients
+from sample_data import (
+    INCOMPLETE_SAMPLE,
+    NEW_CLIENT_SAMPLE,
+    PRIYA_DISCOVERY_CALL_SAMPLE,
+    PRIYA_FOLLOW_UP_SAMPLE,
+    seed_clients,
+)
 from tools import calculate_age, merge_kyc_profiles
 
 # st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
@@ -640,14 +646,24 @@ def render_documents(client: Dict[str, Any]) -> None:
         input_version = st.session_state.document_input_version
         sample_choice = st.selectbox(
             "Use sample input",
-            ["None", "Contradictory sample", "Incomplete sample"],
+            [
+                "None",
+                "Contradictory sample - Priya",
+                "Incomplete sample - Kabir",
+                "Discovery call - Priya",
+                "Follow up - Priya",
+            ],
             key=f"sample_choice_{input_version}",
         )
         default_text = ""
-        if sample_choice == "Contradictory sample":
+        if sample_choice == "Contradictory sample - Priya":
             default_text = NEW_CLIENT_SAMPLE
-        elif sample_choice == "Incomplete sample":
+        elif sample_choice == "Incomplete sample - Kabir":
             default_text = INCOMPLETE_SAMPLE
+        elif sample_choice == "Discovery call - Priya":
+            default_text = PRIYA_DISCOVERY_CALL_SAMPLE
+        elif sample_choice == "Follow up - Priya":
+            default_text = PRIYA_FOLLOW_UP_SAMPLE
 
         uploaded_file = st.file_uploader(
             "Upload .txt file",
