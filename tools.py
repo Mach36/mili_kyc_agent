@@ -184,6 +184,32 @@ _LATEST_RUN_LIST_FIELDS = {
     "confidence_notes",
 }
 
+PROFILE_LIST_FIELDS = {
+    "goals",
+    "liquidity_needs",
+    "dependents",
+    "assets",
+    "liabilities",
+    *_LATEST_RUN_LIST_FIELDS,
+}
+
+
+def profile_list_item_to_text(value: Any) -> str:
+    """Convert model-produced list items into editable, lossless text."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return str(value)
+
+
+def normalise_profile_list(value: Any) -> List[str]:
+    """Coerce a profile list field to the List[str] shape used by the UI."""
+    if value in [None, "", [], {}]:
+        return []
+    items = value if isinstance(value, list) else [value]
+    return [profile_list_item_to_text(item) for item in items]
+
 
 def _list_item_key(value: Any) -> str:
     """Normalise harmless formatting differences in advisor-facing list items."""
@@ -260,13 +286,18 @@ def merge_kyc_profiles(
     """Merge extracted KYC data without erasing previously reviewed values."""
     merged = copy.deepcopy(existing_profile or {})
 
+    for field_name in PROFILE_LIST_FIELDS:
+        if field_name in merged:
+            merged[field_name] = normalise_profile_list(merged[field_name])
+
     for key, value in new_profile.items():
         if key == "client_id" and merged.get("client_id"):
             continue
         if value in [None, "", [], {}]:
             continue
 
-        if isinstance(value, list):
+        if key in PROFILE_LIST_FIELDS:
+            value = normalise_profile_list(value)
             if key in _LATEST_RUN_LIST_FIELDS:
                 merged[key] = copy.deepcopy(value)
                 continue

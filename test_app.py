@@ -6,6 +6,25 @@ from sample_data import INCOMPLETE_SAMPLE
 
 
 class ProfileEditorTests(unittest.TestCase):
+    def test_structured_dependent_from_agent_does_not_crash_editor(self):
+        app = AppTest.from_file("app.py", default_timeout=15).run()
+        selected_client_id = app.session_state["selected_client_id"]
+        clients = app.session_state["clients"]
+        profile = clients[selected_client_id]["profile"]
+        profile["dependents"] = [
+            {"name": "Asha", "relationship": "Daughter", "age": 8}
+        ]
+        app.session_state["clients"] = clients
+        app.session_state["profile_editor_version"] += 1
+
+        app.run()
+
+        dependents = next(
+            widget for widget in app.text_area if widget.label == "Dependents"
+        )
+        self.assertIn('"relationship": "Daughter"', dependents.value)
+        self.assertFalse(app.exception)
+
     def test_score_updates_when_a_form_field_changes(self):
         app = AppTest.from_file("app.py", default_timeout=15).run()
         initial_score = app.session_state["clients"]["client_001"]["profile"][

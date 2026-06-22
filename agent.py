@@ -40,6 +40,7 @@ Important boundaries:
 Final output must be valid JSON only.
 Do not wrap the JSON in markdown.
 Do not add commentary before or after the JSON.
+Every item in a JSON array must be a plain string, not an object or nested array.
 
 The final JSON should follow this shape:
 

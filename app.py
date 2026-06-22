@@ -18,7 +18,12 @@ from sample_data import (
     seed_clients,
 )
 from text_upload import decode_text_upload
-from tools import calculate_age, calculate_profile_completion, merge_kyc_profiles
+from tools import (
+    calculate_age,
+    calculate_profile_completion,
+    merge_kyc_profiles,
+    normalise_profile_list,
+)
 
 # st.set_page_config(page_title="Mili KYC Agent", page_icon="🧾", layout="wide")
 APP_TITLE = "Mili KYC Agent"
@@ -133,8 +138,8 @@ def merge_profile(existing: Dict[str, Any], extracted: Dict[str, Any]) -> Dict[s
     return merge_kyc_profiles(existing, extracted)
 
 
-def list_to_text(items: List[str]) -> str:
-    return "\n".join(items or [])
+def list_to_text(items: Any) -> str:
+    return "\n".join(normalise_profile_list(items))
 
 
 def text_to_list(value: str) -> List[str]:

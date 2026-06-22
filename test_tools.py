@@ -1,7 +1,12 @@
 import unittest
 
 from sample_data import PRIYA_DISCOVERY_CALL_SAMPLE, PRIYA_FOLLOW_UP_SAMPLE
-from tools import calculate_profile_completion, local_extract_kyc_profile
+from tools import (
+    calculate_profile_completion,
+    local_extract_kyc_profile,
+    merge_kyc_profiles,
+    normalise_profile_list,
+)
 
 
 class ProfileCompletionTests(unittest.TestCase):
@@ -28,6 +33,35 @@ class ProfileCompletionTests(unittest.TestCase):
         profile["income"] = None
 
         self.assertEqual(calculate_profile_completion(profile), filled_score - 10)
+
+
+class ProfileListNormalisationTests(unittest.TestCase):
+    def test_structured_items_become_editable_json_text(self):
+        self.assertEqual(
+            normalise_profile_list(
+                [{"relationship": "Son", "age": 12}, "Spouse"]
+            ),
+            ['{"age": 12, "relationship": "Son"}', "Spouse"],
+        )
+
+    def test_merge_repairs_structured_items_already_in_profile(self):
+        merged = merge_kyc_profiles(
+            {"client_id": "client_test", "dependents": [{"name": "Asha"}]},
+            {"occupation": "Consultant"},
+        )
+
+        self.assertEqual(merged["dependents"], ['{"name": "Asha"}'])
+
+    def test_merge_normalises_structured_agent_list_items(self):
+        merged = merge_kyc_profiles(
+            {"client_id": "client_test", "dependents": []},
+            {"dependents": [{"relationship": "Daughter", "age": 8}]},
+        )
+
+        self.assertEqual(
+            merged["dependents"],
+            ['{"age": 8, "relationship": "Daughter"}'],
+        )
 
 
 class IdentityExtractionTests(unittest.TestCase):
