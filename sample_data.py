@@ -7,6 +7,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
     return {
         "client_001": {
             "client_id": "client_001",
+            "kyc_reviewed": False,
             "profile": {
                 "client_id": "client_001",
                 "name": "Anika Sharma",
@@ -77,6 +78,7 @@ def seed_clients() -> Dict[str, Dict[str, Any]]:
         },
         "client_002": {
             "client_id": "client_002",
+            "kyc_reviewed": False,
             "profile": {
                 "client_id": "client_002",
                 "name": "Rohan Mehta",

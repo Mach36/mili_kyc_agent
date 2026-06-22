@@ -85,6 +85,8 @@ GENDER_OPTIONS = [
 def init_state() -> None:
     if "clients" not in st.session_state:
         st.session_state.clients = seed_clients()
+    for client in st.session_state.clients.values():
+        client.setdefault("kyc_reviewed", False)
     if "selected_client_id" not in st.session_state:
         st.session_state.selected_client_id = next(iter(st.session_state.clients.keys()))
     if "last_agent_run" not in st.session_state:
@@ -303,6 +305,27 @@ def render_sidebar() -> None:
     st.sidebar.title("Advisor Workspace")
 
     st.sidebar.subheader("Clients")
+    reviewed_client_ids = [
+        client_id
+        for client_id, record in st.session_state.clients.items()
+        if record.get("kyc_reviewed", False)
+    ]
+    if reviewed_client_ids:
+        reviewed_selectors = ",\n".join(
+            f".st-key-select_{client_id} button, .st-key-select_{client_id} button p"
+            for client_id in reviewed_client_ids
+        )
+        st.sidebar.html(
+            f"""
+            <style>
+            {reviewed_selectors} {{
+                color: #16a34a !important;
+                border-color: rgba(34, 197, 94, 0.55) !important;
+            }}
+            </style>
+            """,
+        )
+
     for client_id, record in st.session_state.clients.items():
         name = record["profile"].get("name") or "Unnamed client"
         label = f"{'▸ ' if client_id == st.session_state.selected_client_id else ''}{name}"
@@ -325,6 +348,7 @@ def render_sidebar() -> None:
             "client_id": client_id,
             "profile": new_empty_profile(client_id, clean_name),
             "documents": [],
+            "kyc_reviewed": False,
         }
         st.session_state.selected_client_id = client_id
         st.session_state.new_client_input_version += 1
@@ -332,12 +356,29 @@ def render_sidebar() -> None:
         st.rerun()
 
 
+def update_kyc_review_status(client_id: str, widget_key: str) -> None:
+    """Persist review status before Streamlit redraws the sidebar."""
+    st.session_state.clients[client_id]["kyc_reviewed"] = bool(st.session_state[widget_key])
+
+
 def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
     profile = client["profile"]
     score = profile.get("completion_score", 0)
     version = st.session_state.profile_editor_version
 
-    st.subheader("KYC Profile")
+    title_col, review_col = st.columns([4, 1])
+    with title_col:
+        st.subheader("KYC Profile")
+    with review_col:
+        review_key = f"kyc_reviewed_{client_id}"
+        st.checkbox(
+            "KYC review",
+            value=bool(client.get("kyc_reviewed", False)),
+            key=review_key,
+            on_change=update_kyc_review_status,
+            args=(client_id, review_key),
+            help="Mark this client's KYC profile as reviewed by the advisor.",
+        )
     st.progress(min(100, int(score)) / 100, text=f"Profile completion: {score}%")
 
     c1, c2, c3, c4 = st.columns(4)
