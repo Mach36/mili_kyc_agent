@@ -234,6 +234,24 @@ def apply_global_styles() -> None:
             background: linear-gradient(135deg, var(--mili-navy), var(--mili-blue));
             box-shadow: 0 7px 18px rgba(20, 43, 74, 0.18);
         }}
+        .st-key-download_client_json button {{
+            position: relative;
+            top: 0.3rem;
+            min-height: 2rem;
+            padding: 0.3rem 0.6rem;
+            border-color: transparent;
+            background: transparent;
+            color: var(--mili-muted);
+            box-shadow: none;
+            font-size: 0.82rem;
+        }}
+        .st-key-download_client_json button:hover {{
+            border-color: transparent;
+            background: var(--mili-selected);
+            color: var(--mili-navy);
+            box-shadow: none;
+            transform: none;
+        }}
 
         [data-testid="stExpander"] {{
             overflow: hidden;
@@ -1421,14 +1439,19 @@ def main() -> None:
         render_agent_actions(client_id, client)
 
     with tab3:
-        st.subheader("Structured client record")
+        with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+            st.subheader("Structured client record", anchor=False, width="content")
+            st.download_button(
+                "Download JSON",
+                data=json.dumps(client, indent=2),
+                file_name=f"{profile.get('name') or client_id}_kyc_profile.json".replace(" ", "_"),
+                mime="application/json",
+                key="download_client_json",
+                type="tertiary",
+                icon=":material/download:",
+                on_click="ignore",
+            )
         st.json(client)
-        st.download_button(
-            "Download client JSON",
-            data=json.dumps(client, indent=2),
-            file_name=f"{profile.get('name') or client_id}_kyc_profile.json".replace(" ", "_"),
-            mime="application/json",
-        )
 
     st.divider()
     st.caption("Advisor remains responsible for reviewing extracted fields, confirming uncertain information, and making any KYC or suitability decision.")
