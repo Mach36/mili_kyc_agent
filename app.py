@@ -44,12 +44,12 @@ def apply_global_styles() -> None:
             --mili-blue: #246b83;
             --mili-teal: #20a39e;
             --mili-mint: #e8f7f5;
-            --mili-selected: light-dark(#eaf1f8, #1d3048);
-            --mili-surface: light-dark(#ffffff, #172033);
-            --mili-surface-soft: light-dark(#f5f8fb, #111827);
-            --mili-border: light-dark(#dce5ed, #334155);
-            --mili-text: light-dark(#172033, #f1f5f9);
-            --mili-muted: light-dark(#607086, #a8b4c5);
+            --mili-selected: #eaf1f8;
+            --mili-surface: #ffffff;
+            --mili-surface-soft: #f5f8fb;
+            --mili-border: #dce5ed;
+            --mili-text: #172033;
+            --mili-muted: #607086;
             --mili-shadow: 0 10px 28px rgba(20, 43, 74, 0.08);
             --mili-radius: 0.75rem;
         }}
@@ -62,7 +62,7 @@ def apply_global_styles() -> None:
         }}
 
         [data-testid="stHeader"] {{
-            background: color-mix(in srgb, var(--mili-surface) 90%, transparent);
+            background: rgba(255, 255, 255, 0.94);
             border-bottom: 1px solid var(--mili-border);
             backdrop-filter: blur(12px);
         }}
@@ -110,7 +110,7 @@ def apply_global_styles() -> None:
         }}
 
         [data-testid="stSidebar"] {{
-            background: light-dark(#f8fbfd, #111827);
+            background: #f8fbfd;
             border-right: 1px solid var(--mili-border);
         }}
         [data-testid="stSidebar"] [data-testid="stSidebarContent"] {{
@@ -214,8 +214,8 @@ def apply_global_styles() -> None:
             font-size: 0.78rem;
         }}
         .st-key-remove_selected_client button:hover {{
-            border-color: color-mix(in srgb, #b42318 35%, transparent) !important;
-            background: color-mix(in srgb, #b42318 8%, transparent) !important;
+            border-color: #f5c2bd !important;
+            background: #fff1f0 !important;
             color: #b42318 !important;
             box-shadow: none !important;
             transform: none;
@@ -332,9 +332,8 @@ def apply_global_styles() -> None:
             padding: 0.35rem;
             border: 1px solid var(--mili-border);
             border-radius: var(--mili-radius);
-            background: color-mix(in srgb, var(--mili-surface) 94%, transparent);
+            background: var(--mili-surface);
             box-shadow: var(--mili-shadow);
-            backdrop-filter: blur(12px);
         }}
         [data-baseweb="tab-list"] {{
             gap: 0.3rem;
@@ -380,6 +379,43 @@ def apply_global_styles() -> None:
 
 
 apply_global_styles()
+
+
+def clear_saved_streamlit_theme() -> None:
+    """Clear old browser theme picks so the configured demo theme wins."""
+    components.html(
+        """
+        <script>
+        const parentWindow = window.parent;
+        const path = parentWindow.location.pathname;
+        const markerKey = `miliKycThemeReset-${path}`;
+        const baseKey = `stActiveTheme-${path}`;
+        const themeKeys = ["stActiveTheme", baseKey];
+        for (let version = 1; version <= 5; version += 1) {
+            themeKeys.push(`${baseKey}-v${version}`);
+        }
+
+        let removedTheme = false;
+        if (parentWindow.localStorage.getItem(markerKey) !== "done") {
+            themeKeys.forEach((key) => {
+                if (parentWindow.localStorage.getItem(key) !== null) {
+                    parentWindow.localStorage.removeItem(key);
+                    removedTheme = true;
+                }
+            });
+            parentWindow.localStorage.setItem(markerKey, "done");
+        }
+
+        if (removedTheme) {
+            parentWindow.location.reload();
+        }
+        </script>
+        """,
+        height=0,
+    )
+
+
+clear_saved_streamlit_theme()
 
 
 PROFILE_FIELDS = [
@@ -925,7 +961,7 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             width: fit-content;
             margin-left: auto;
             padding: 0.22rem 0.65rem;
-            border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+            border: 1px solid #dce5ed;
             border-radius: 999px;
             font-size: 0.78rem;
             font-weight: 600;
@@ -933,8 +969,8 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
             white-space: nowrap;
         }
         .kyc-review-status.complete {
-            border-color: color-mix(in srgb, #16a34a 35%, transparent);
-            background: color-mix(in srgb, #16a34a 12%, transparent);
+            border-color: #a7f3d0;
+            background: #dcfce7;
             color: #15803d;
         }
         .kyc-review-status.incomplete {
@@ -1107,7 +1143,7 @@ def render_profile_editor(client_id: str, client: Dict[str, Any]) -> None:
                 transform: translateY(-50%);
                 z-index: 2;
                 overflow: hidden;
-                color: var(--text-color, CanvasText);
+                color: var(--mili-text);
                 font-size: 0.7rem;
                 line-height: 1.25rem;
                 text-overflow: ellipsis;
@@ -1578,7 +1614,7 @@ def main() -> None:
             content: "Confidence";
             display: block;
             padding: 0.4rem 0.75rem 0.2rem;
-            color: var(--text-color);
+            color: var(--mili-text);
             opacity: 0.65;
             font-size: 0.68rem;
             font-style: italic;
@@ -1641,20 +1677,20 @@ def main() -> None:
             height: 100%;
             display: flex;
             align-items: center;
-            color: var(--text-color, CanvasText) !important;
+            color: var(--mili-text) !important;
             overflow: visible;
         }
         [class*="st-key-identity_details_"]
         [data-baseweb="select"] > div > div:first-child > div:first-child {
             display: block !important;
-            color: var(--text-color, CanvasText) !important;
+            color: var(--mili-text) !important;
             opacity: 1 !important;
             visibility: visible !important;
             white-space: nowrap;
         }
         [class*="st-key-identity_details_"] .stSelectbox input {
-            color: var(--text-color, CanvasText) !important;
-            -webkit-text-fill-color: var(--text-color, CanvasText) !important;
+            color: var(--mili-text) !important;
+            -webkit-text-fill-color: var(--mili-text) !important;
             opacity: 1 !important;
         }
         [class*="st-key-identity_details_"] .stSelectbox,

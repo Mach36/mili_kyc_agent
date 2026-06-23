@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
@@ -6,6 +7,17 @@ from sample_data import INCOMPLETE_SAMPLE
 
 
 class ProfileEditorTests(unittest.TestCase):
+    def test_app_theme_is_light_only(self):
+        app_source = Path("app.py").read_text()
+        theme_config = Path(".streamlit/config.toml").read_text()
+
+        self.assertNotIn("light-dark(", app_source)
+        self.assertNotIn("color-scheme", app_source)
+        self.assertNotIn("CanvasText", app_source)
+        self.assertNotIn("color-mix(", app_source)
+        self.assertIn('toolbarMode = "minimal"', theme_config)
+        self.assertIn('base = "light"', theme_config)
+
     def test_new_client_panel_still_creates_and_selects_client(self):
         app = AppTest.from_file("app.py", default_timeout=15).run()
         client_name = next(
