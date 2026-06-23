@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from sample_data import PRIYA_DISCOVERY_CALL_SAMPLE, PRIYA_FOLLOW_UP_SAMPLE
@@ -5,8 +6,11 @@ from tools import (
     calculate_profile_completion,
     local_extract_kyc_profile,
     merge_kyc_profiles,
+    normalise_follow_up_questions,
+    normalise_kyc_profile,
     normalise_profile_list,
     normalise_time_horizon,
+    normalise_validation_result,
 )
 
 
@@ -37,6 +41,83 @@ class ProfileCompletionTests(unittest.TestCase):
 
 
 class ProfileListNormalisationTests(unittest.TestCase):
+    def test_normalises_gpt_draft_profile_json(self):
+        profile = normalise_kyc_profile(
+            json.dumps(
+                {
+                    "client_id": "priya",
+                    "name": "Priya Kapoor",
+                    "date_of_birth": "1986-04-12",
+                    "dependents": [{"relationship": "son", "age": 8}],
+                    "risk_tolerance": "Moderate",
+                    "time_horizon": {
+                        "Short Term": "12-18 months for home renovation",
+                        "Long Term": ["Retirement", "Son's education"],
+                    },
+                }
+            ),
+            client_id="fallback_id",
+        )
+
+        self.assertEqual(profile["client_id"], "priya")
+        self.assertEqual(profile["dependents"], ["Son aged 8"])
+        self.assertEqual(profile["risk_tolerance"]["value"], "Moderate")
+        self.assertEqual(
+            profile["time_horizon"],
+            {
+                "home_renovation": "12-18 months",
+                "retirement": "Long term - exact time horizon not confirmed",
+                "child_education": "Long term - exact time horizon not confirmed",
+            },
+        )
+
+    def test_sdk_normaliser_does_not_extract_from_raw_text(self):
+        profile = normalise_kyc_profile(
+            "Client name: Priya Kapoor\nDependents: Son",
+            client_id="priya",
+        )
+
+        self.assertEqual(profile["client_id"], "priya")
+        self.assertIsNone(profile["name"])
+        self.assertEqual(profile["dependents"], [])
+
+    def test_normalises_gpt_validation_draft(self):
+        validation = normalise_validation_result(
+            json.dumps(
+                {
+                    "missing_information": ["Insurance coverage"],
+                    "contradictions": [{"issue": "Risk tolerance needs confirmation"}],
+                    "confidence_notes": "DOB came from the intake form",
+                    "completion_score": "86",
+                }
+            )
+        )
+
+        self.assertEqual(validation["missing_information"], ["Insurance coverage"])
+        self.assertEqual(validation["contradictions"], ['{"issue": "Risk tolerance needs confirmation"}'])
+        self.assertEqual(validation["confidence_notes"], ["DOB came from the intake form"])
+        self.assertEqual(validation["completion_score"], 86)
+
+    def test_normalises_gpt_follow_up_question_draft(self):
+        questions = normalise_follow_up_questions(
+            json.dumps(
+                {
+                    "follow_up_questions": [
+                        "Can you confirm the current insurance coverage?",
+                        {"question": "What emergency cash should remain liquid?"},
+                    ]
+                }
+            )
+        )
+
+        self.assertEqual(
+            questions["follow_up_questions"],
+            [
+                "Can you confirm the current insurance coverage?",
+                '{"question": "What emergency cash should remain liquid?"}',
+            ],
+        )
+
     def test_structured_dependents_become_readable_english(self):
         self.assertEqual(
             normalise_profile_list(

@@ -1410,7 +1410,9 @@ def render_agent_actions(client_id: str, client: Dict[str, Any]) -> None:
     combined_text = "\n\n".join([f"## {d['title']}\n{d['text']}" for d in active_docs])
 
     st.subheader("Agent run", anchor=False)
-    st.caption("The agent extracts KYC fields, validates completeness, and generates advisor follow-up questions.")
+    st.caption(
+        "With an API key, GPT drafts the profile, validation, and follow-up questions; the tools only clean and normalise those drafts. Local rules are fallback only."
+    )
 
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -1495,8 +1497,22 @@ def render_agent_actions(client_id: str, client: Dict[str, Any]) -> None:
     if st.session_state.last_agent_run:
         result = st.session_state.last_agent_run
         mode = result.get("mode", "profile_direct")
-        tools = result.get("tool_trace", [])
-        st.caption(f"Mode: {mode} | Tools: {', '.join(tools) if tools else 'N/A'}")
+        trace = result.get("tool_trace", [])
+        trace_names = [
+            step.get("name", "Unnamed step") if isinstance(step, dict) else str(step)
+            for step in trace
+        ]
+        st.caption(f"Mode: {mode} | Trace: {' -> '.join(trace_names) if trace_names else 'N/A'}")
+        if trace:
+            with st.expander("Tool-call trace", expanded=False):
+                for index, step in enumerate(trace, start=1):
+                    if isinstance(step, dict):
+                        name = step.get("name", "Unnamed step")
+                        detail = step.get("detail", "")
+                    else:
+                        name = str(step)
+                        detail = ""
+                    st.markdown(f"{index}. `{name}`" + (f" - {detail}" if detail else ""))
         if result.get("error"):
             st.warning(f"SDK fallback used because: {result['error']}")
 

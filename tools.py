@@ -184,14 +184,71 @@ _LATEST_RUN_LIST_FIELDS = {
     "confidence_notes",
 }
 
-PROFILE_LIST_FIELDS = {
+PROFILE_LIST_FIELD_ORDER = (
     "goals",
     "liquidity_needs",
     "dependents",
     "assets",
     "liabilities",
-    *_LATEST_RUN_LIST_FIELDS,
-}
+    "missing_information",
+    "contradictions",
+    "follow_up_questions",
+    "confidence_notes",
+)
+
+PROFILE_LIST_FIELDS = set(PROFILE_LIST_FIELD_ORDER)
+
+PROFILE_SCALAR_FIELDS = (
+    "name",
+    "gender",
+    "pronouns",
+    "occupation",
+    "marital_status",
+    "income",
+)
+
+VALIDATION_LIST_FIELDS = (
+    "missing_information",
+    "contradictions",
+    "confidence_notes",
+)
+
+
+def _json_value_from_value(value: Any) -> Any:
+    """Parse JSON from model output without treating prose as source text."""
+    if isinstance(value, (dict, list)):
+        return copy.deepcopy(value)
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    candidates = [
+        (text.find("{"), text.rfind("}")),
+        (text.find("["), text.rfind("]")),
+    ]
+    for start, end in candidates:
+        if start == -1 or end == -1 or end <= start:
+            continue
+        try:
+            return json.loads(text[start : end + 1])
+        except Exception:
+            continue
+
+    return None
+
+
+def _json_object_from_value(value: Any) -> Dict[str, Any]:
+    """Parse a JSON object from model output without treating prose as source text."""
+    parsed = _json_value_from_value(value)
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def profile_list_item_to_text(value: Any) -> str:
@@ -236,6 +293,117 @@ def normalise_profile_list(value: Any, field_name: Optional[str] = None) -> List
     items = value if isinstance(value, list) else [value]
     formatter = dependent_item_to_text if field_name == "dependents" else profile_list_item_to_text
     return [formatter(item) for item in items]
+
+
+def _normalise_date_of_birth(value: Any) -> Optional[str]:
+    if isinstance(value, datetime):
+        parsed = value.date()
+        iso_value = parsed.isoformat()
+        return iso_value if calculate_age(iso_value) is not None else None
+    if isinstance(value, date):
+        iso_value = value.isoformat()
+        return iso_value if calculate_age(iso_value) is not None else None
+    if value in [None, ""]:
+        return None
+    return _extract_date_of_birth(f"Date of birth: {value}")
+
+
+def _normalise_age(value: Any) -> Optional[int]:
+    try:
+        match = re.search(r"\d{1,3}", str(value))
+        if not match:
+            return None
+        age = int(match.group(0))
+        return age if 18 <= age <= 100 else None
+    except Exception:
+        return None
+
+
+def _normalise_risk_tolerance(value: Any) -> Dict[str, Any]:
+    if value in [None, "", {}, []]:
+        return {}
+    if not isinstance(value, dict):
+        risk_value = _clean(str(value))
+        return {"value": risk_value, "confidence": "unknown"} if risk_value else {}
+
+    risk_value = _clean(str(value.get("value"))) if value.get("value") not in [None, ""] else None
+    confidence = _clean(str(value.get("confidence"))) if value.get("confidence") not in [None, ""] else None
+    evidence = _clean(str(value.get("evidence"))) if value.get("evidence") not in [None, ""] else None
+
+    risk: Dict[str, Any] = {}
+    if risk_value:
+        risk["value"] = risk_value
+    if confidence or risk_value or evidence:
+        risk["confidence"] = confidence or "unknown"
+    if evidence:
+        risk["evidence"] = evidence
+    return risk
+
+
+def normalise_kyc_profile(profile_json: Any, client_id: str = "new_client") -> Dict[str, Any]:
+    """
+    Clean a model-drafted KYC profile into the app's reviewable schema.
+
+    This is the SDK-mode repair step: GPT performs the semantic extraction from
+    raw text first, then this function validates shapes and normalises values.
+    It intentionally does not run local text extraction.
+    """
+    draft = _json_object_from_value(profile_json)
+
+    profile: Dict[str, Any] = {
+        "client_id": _clean(str(draft.get("client_id") or client_id)) or client_id,
+        "risk_tolerance": {},
+        "time_horizon": {},
+    }
+
+    for field_name in PROFILE_SCALAR_FIELDS:
+        value = draft.get(field_name)
+        profile[field_name] = _clean(str(value)) if value not in [None, ""] else None
+
+    date_of_birth = _normalise_date_of_birth(draft.get("date_of_birth"))
+    profile["date_of_birth"] = date_of_birth
+    profile["age"] = calculate_age(date_of_birth) if date_of_birth else _normalise_age(draft.get("age"))
+
+    for field_name in PROFILE_LIST_FIELD_ORDER:
+        profile[field_name] = normalise_profile_list(draft.get(field_name), field_name)
+
+    profile["risk_tolerance"] = _normalise_risk_tolerance(draft.get("risk_tolerance"))
+    profile["time_horizon"] = normalise_time_horizon(draft.get("time_horizon", {}))
+
+    completion_score = draft.get("completion_score")
+    try:
+        profile["completion_score"] = max(0, min(100, int(completion_score)))
+    except (TypeError, ValueError):
+        profile["completion_score"] = 0
+
+    return profile
+
+
+def normalise_validation_result(validation_json: Any) -> Dict[str, Any]:
+    """Clean a GPT-drafted validation result without generating validation locally."""
+    draft = _json_object_from_value(validation_json)
+    validation: Dict[str, Any] = {
+        field_name: normalise_profile_list(draft.get(field_name))
+        for field_name in VALIDATION_LIST_FIELDS
+    }
+
+    completion_score = draft.get("completion_score")
+    try:
+        validation["completion_score"] = max(0, min(100, int(completion_score)))
+    except (TypeError, ValueError):
+        validation["completion_score"] = 0
+
+    return validation
+
+
+def normalise_follow_up_questions(questions_json: Any) -> Dict[str, List[str]]:
+    """Clean GPT-drafted advisor follow-up questions without generating them locally."""
+    parsed = _json_value_from_value(questions_json)
+    if isinstance(parsed, dict):
+        questions = parsed.get("follow_up_questions", [])
+    else:
+        questions = parsed
+    return {"follow_up_questions": normalise_profile_list(questions)}
 
 
 _GENERIC_HORIZON_LABELS = {
@@ -996,33 +1164,21 @@ def local_generate_follow_up_questions(validation_result: Dict[str, Any]) -> Lis
 # -----------------------------
 
 @function_tool
-def extract_kyc_profile(raw_text: str, client_id: str = "new_client") -> str:
-    """Extract a structured KYC profile from raw client onboarding notes, forms, transcripts, or document text."""
-    profile = local_extract_kyc_profile(raw_text=raw_text, client_id=client_id)
+def extract_kyc_profile(draft_profile_json: str, client_id: str = "new_client") -> str:
+    """Clean and normalise a GPT-drafted KYC profile JSON object."""
+    profile = normalise_kyc_profile(profile_json=draft_profile_json, client_id=client_id)
     return json.dumps(profile, indent=2)
 
 
 @function_tool
-def validate_kyc_completeness(profile_json: str) -> str:
-    """Validate a structured KYC profile and return missing information, contradictions, confidence notes, and completion score."""
-    try:
-        profile = json.loads(profile_json)
-    except Exception:
-        profile = {}
-    validation = local_validate_kyc_completeness(profile)
+def validate_kyc_completeness(draft_validation_json: str) -> str:
+    """Clean and normalise GPT-drafted gaps, contradictions, confidence notes, and completion score."""
+    validation = normalise_validation_result(draft_validation_json)
     return json.dumps(validation, indent=2)
 
 
 @function_tool
-def generate_follow_up_questions(validation_json: str) -> str:
-    """Generate targeted advisor follow-up questions from missing information, contradictions, and low-confidence areas."""
-    try:
-        validation_result = json.loads(validation_json)
-    except Exception:
-        validation_result = {
-            "missing_information": ["Unable to parse validation result"],
-            "contradictions": [],
-            "confidence_notes": [],
-        }
-    questions = local_generate_follow_up_questions(validation_result)
-    return json.dumps({"follow_up_questions": questions}, indent=2)
+def generate_follow_up_questions(draft_questions_json: str) -> str:
+    """Clean and normalise GPT-drafted advisor follow-up questions."""
+    questions = normalise_follow_up_questions(draft_questions_json)
+    return json.dumps(questions, indent=2)

@@ -12,6 +12,7 @@ from tools import (
     local_validate_kyc_completeness,
     local_generate_follow_up_questions,
     merge_kyc_profiles,
+    normalise_kyc_profile,
 )
 
 load_dotenv()
@@ -23,10 +24,23 @@ You are a Client Onboarding & KYC assistant for a wealth advisor.
 Your job is to help the advisor turn messy onboarding notes, transcripts, forms,
 and document text into a structured reviewable client profile.
 
+In API mode, you are responsible for the semantic work. Read the raw onboarding
+input yourself and draft each JSON artifact from the evidence before calling a
+tool. Do not ask tools to extract, validate, score, or generate questions from
+raw text. The tools only clean and normalise your drafts.
+
 You must use the available tools in this order:
 1. extract_kyc_profile
+   - Input: your draft profile JSON, not the raw onboarding text.
+   - Purpose: clean and normalise your draft into the app schema.
 2. validate_kyc_completeness
+   - Input: your draft validation JSON after reviewing the normalised profile.
+   - Purpose: clean missing_information, contradictions, confidence_notes, and
+     completion_score. You decide those values.
 3. generate_follow_up_questions
+   - Input: your draft follow-up question JSON after reviewing the normalised
+     validation result.
+   - Purpose: clean follow_up_questions. You decide the questions.
 
 Important boundaries:
 - Do not approve or reject KYC.
@@ -42,7 +56,9 @@ Do not wrap the JSON in markdown.
 Do not add commentary before or after the JSON.
 Every item in a JSON array must be a plain string, not an object or nested array.
 Preserve the structured values returned by the tools. Do not reorganize them
-into a new summary shape.
+into a new summary shape. The final profile should use the normalised profile
+returned by extract_kyc_profile as its base, then add the normalised validation
+fields and follow-up questions returned by the later tools.
 
 For time_horizon specifically:
 - It must map a specific goal or need key to one plain string horizon.
@@ -158,11 +174,54 @@ def _local_fallback_run(
     return _merge_profile(existing_profile, extracted)
 
 
-def _tool_trace() -> list[str]:
+def _tool_trace(mode: str) -> list[Dict[str, str]]:
+    if mode == "openai_agents_sdk":
+        return [
+            {
+                "name": "GPT semantic draft",
+                "detail": "Model reads active documents and drafts the profile JSON.",
+            },
+            {
+                "name": "extract_kyc_profile",
+                "detail": "Tool cleans and normalises the GPT profile draft; it does not run local extraction.",
+            },
+            {
+                "name": "GPT validation draft",
+                "detail": "Model reviews the normalised profile and drafts gaps, contradictions, confidence notes, and score.",
+            },
+            {
+                "name": "validate_kyc_completeness",
+                "detail": "Tool cleans and normalises the GPT validation draft; it does not run local validation.",
+            },
+            {
+                "name": "GPT follow-up draft",
+                "detail": "Model reviews the validation result and drafts advisor follow-up questions.",
+            },
+            {
+                "name": "generate_follow_up_questions",
+                "detail": "Tool cleans and normalises the GPT question draft; it does not run local question generation.",
+            },
+        ]
+    if mode == "no_input":
+        return [
+            {
+                "name": "No tool calls",
+                "detail": "No active document text was available for an agent run.",
+            }
+        ]
     return [
-        "extract_kyc_profile",
-        "validate_kyc_completeness",
-        "generate_follow_up_questions",
+        {
+            "name": "local_extract_kyc_profile",
+            "detail": "Fallback rule-based extraction used because API mode was unavailable or bypassed.",
+        },
+        {
+            "name": "local_validate_kyc_completeness",
+            "detail": "Fallback deterministic completeness checks and scoring.",
+        },
+        {
+            "name": "local_generate_follow_up_questions",
+            "detail": "Fallback deterministic advisor question generation.",
+        },
     ]
 
 
@@ -173,7 +232,7 @@ def _wrap_result(profile: Dict[str, Any], mode: str, error: Optional[str] = None
     """
     result: Dict[str, Any] = {
         "mode": mode,
-        "tool_trace": _tool_trace(),
+        "tool_trace": _tool_trace(mode),
         "profile": profile,
     }
     if error:
@@ -267,6 +326,7 @@ Return the final merged KYC profile as valid JSON only.
             raise ValueError("Agent did not return valid JSON.")
 
         parsed["client_id"] = parsed.get("client_id") or client_id
+        parsed = normalise_kyc_profile(parsed, client_id=client_id)
         profile = _merge_profile(existing_profile, parsed)
         return _wrap_result(profile, mode="openai_agents_sdk")
 

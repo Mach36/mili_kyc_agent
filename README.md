@@ -25,12 +25,23 @@ can be explored without an API key.
 
 ## How it works
 
-The agent runs three tools in sequence:
+With an API key, GPT performs the semantic work: it reads the active documents,
+drafts the profile JSON, reviews completeness, assigns the score, and drafts
+advisor follow-up questions from the evidence. The tools run in sequence only to
+clean and normalise GPT's drafts:
 
-1. `extract_kyc_profile` converts active document text into structured fields.
-2. `validate_kyc_completeness` identifies gaps, contradictions, confidence
-   concerns, and a completion score.
-3. `generate_follow_up_questions` creates questions for the advisor to ask next.
+1. `extract_kyc_profile` cleans and normalises GPT's draft JSON into
+   the app schema. In API mode it is not used for local rule-based extraction.
+2. `validate_kyc_completeness` cleans GPT's drafted gaps, contradictions,
+   confidence concerns, and completion score. In API mode it is not used for
+   local rule-based validation.
+3. `generate_follow_up_questions` cleans GPT's drafted advisor questions. In API
+   mode it is not used for local rule-based question generation.
+
+If the API key is missing, local demo mode is enabled, or the SDK call fails,
+the app falls back to the deterministic local extraction, validation, and
+question-generation functions. The **Documents & agent** tab shows the mode and
+an inspectable trace for the latest run.
 
 New results are merged into the existing profile without allowing empty values
 to erase previously captured or advisor-reviewed information. Removing a
@@ -102,7 +113,7 @@ quick demonstration.
 
 | Mode shown in the UI | Meaning |
 | --- | --- |
-| `openai_agents_sdk` | The OpenAI Agents SDK completed the workflow. |
+| `openai_agents_sdk` | The OpenAI Agents SDK completed the workflow: GPT drafted the profile, validation, and questions; tools only normalised those drafts. |
 | `local_fallback_no_api_key` | No API key was configured, so local rules were used. |
 | `local_fallback` | Local mode was explicitly enabled. |
 | `local_fallback_after_sdk_error` | The SDK failed and the app recovered locally. |
